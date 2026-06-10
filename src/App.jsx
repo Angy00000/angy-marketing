@@ -1,63 +1,115 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-// ─── LOGO SVG ────────────────────────────────────────────────────────────────
+// ─── LOGO SVG PIXEL-PERFECT ───────────────────────────────────────────────────
 const AngyLogo = ({ width = 180, light = false }) => {
   const tc = light ? "#0A0A0F" : "#FFFFFF";
-  const r = 20, ep = r*2;
-  const cx0 = 42, cy = 42;
-  const compX = cx0 + ep*3 + r + 12;
-  const rougeX = compX + 148 + 10;
-  const W = rougeX + 52, H = 84;
+  // Mesures exactes basées sur l'image originale
+  // Cercles : rayon 24px, collés (centre à centre = 48px)
+  const R = 24;           // rayon cercle
+  const D = R * 2;        // diamètre = écart centre à centre pour cercles collés
+  const logoH = 100;      // hauteur totale viewBox
+  const cy = 54;          // centre vertical des cercles (milieu de la hauteur)
+
+  // Crochet bleu : commence à x=5, barre verticale montant depuis haut des cercles
+  // La barre horizontale bleue est en bas et fait ~70% de la hauteur du crochet
+  const bvX = 5;          // x barre verticale bleue
+  const bvEp = 12;        // épaisseur trait
+  const bvTop = cy - R - 4;  // commence au dessus du cercle A
+  const bvBot = cy + R + 12; // descend sous le cercle
+  const bhBot = bvBot;    // barre horizontale au bas de la barre verticale
+  const bhLen = 55;       // longueur barre horizontale bleue
+
+  // Espace entre crochet bleu et premier cercle A
+  const gapBleu = 14;
+  const cxA = bvX + bvEp + gapBleu + R; // centre cercle A
+
+  // Centres des 4 cercles collés
+  const cxN = cxA + D;
+  const cxG = cxN + D;
+  const cxY = cxG + D;
+
+  // "Company" après Y avec espace
+  const gapComp = 12;
+  const compX = cxY + R + gapComp;
+  const compFont = 36;
+
+  // Crochet rouge : commence après "Company"
+  // "Company" en Arial Black 36px ≈ largeur 170px
+  const compW = 170;
+  const gapRouge = 12;
+  const rvX = compX + compW + gapRouge; // x barre verticale rouge (à droite)
+  const rvEp = 12;        // épaisseur trait rouge
+  const rhTop = bvTop;    // même hauteur que le haut du crochet bleu
+  const rhLen = 60;       // longueur barre horizontale rouge
+  const rvH = (cy + R + 4) - rhTop; // hauteur barre verticale rouge
+
+  const viewW = rvX + rvEp + 4;
+
   return (
-    <svg width={width} height={Math.round(H*(width/W))} viewBox={`0 0 ${W} ${H}`} fill="none">
-      {/* Crochet bleu bas-gauche */}
-      <rect x="4" y="8"  width="9" height={cy+r-8+6} fill="#1400FF"/>
-      <rect x="4" y={cy+r-2} width="36" height="9" fill="#1400FF"/>
-      {/* Cercles ANGY collés */}
-      {[[cx0,"A"],[cx0+ep,"N"],[cx0+ep*2,"G"],[cx0+ep*3,"Y"]].map(([cx,l])=>(
+    <svg width={width} height={Math.round(logoH*(width/viewW))} viewBox={`0 0 ${viewW} ${logoH}`} fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* CROCHET BLEU BAS-GAUCHE */}
+      <rect x={bvX} y={bvTop} width={bvEp} height={bvBot-bvTop} fill="#1400FF"/>
+      <rect x={bvX} y={bhBot-bvEp} width={bhLen} height={bvEp} fill="#1400FF"/>
+      {/* CERCLES ANGY COLLÉS */}
+      {[[cxA,"A"],[cxN,"N"],[cxG,"G"],[cxY,"Y"]].map(([cx,l])=>(
         <g key={l}>
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke={tc} strokeWidth="2"/>
-          <text x={cx} y={cy+7} textAnchor="middle" fontFamily="Arial Black,Arial" fontWeight="900" fontSize="18" fill={tc}>{l}</text>
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke={tc} strokeWidth="2.5"/>
+          <text x={cx} y={cy+9} textAnchor="middle" fontFamily="Arial Black,Arial,sans-serif" fontWeight="900" fontSize="22" fill={tc}>{l}</text>
         </g>
       ))}
-      {/* Company */}
-      <text x={compX} y={cy+9} fontFamily="Arial Black,Arial" fontWeight="900" fontSize="28" fill={tc}>Company</text>
-      {/* Crochet rouge haut-droit */}
-      <rect x={rougeX}    y="8"  width="48" height="9"  fill="#CC0000"/>
-      <rect x={rougeX+39} y="8"  width="9"  height="36" fill="#CC0000"/>
+      {/* COMPANY */}
+      <text x={compX} y={cy+11} fontFamily="Arial Black,Arial,sans-serif" fontWeight="900" fontSize={compFont} fill={tc}>Company</text>
+      {/* CROCHET ROUGE HAUT-DROIT */}
+      <rect x={rvX-rhLen+rvEp} y={rhTop} width={rhLen} height={rvEp} fill="#CC0000"/>
+      <rect x={rvX} y={rhTop} width={rvEp} height={rvH} fill="#CC0000"/>
     </svg>
   );
 };
 
-// ─── LOGO CANVAS ─────────────────────────────────────────────────────────────
+// ─── LOGO CANVAS PIXEL-PERFECT ───────────────────────────────────────────────
 function drawLogo(ctx, x, y, targetW, light=false) {
   const tc = light ? "#0A0A0F" : "#FFFFFF";
-  const r=20, ep=r*2, cx0=42, cy=42;
-  const compX = cx0+ep*3+r+12;
-  const rougeX = compX+148+10;
-  const W = rougeX+52;
-  const sc = targetW/W;
+  const R=24, Diam=R*2, logoH=100, cy=54;
+  const bvX=5, bvEp=12;
+  const bvTop=cy-R-4, bvBot=cy+R+12;
+  const bhLen=55;
+  const cxA=bvX+bvEp+14+R;
+  const cxN=cxA+Diam, cxG=cxN+Diam, cxY=cxG+Diam;
+  const compX=cxY+R+12;
+  const compW=170, gapRouge=12;
+  const rvX=compX+compW+gapRouge;
+  const rvEp=12, rhLen=60;
+  const rhTop=bvTop;
+  const rvH=(cy+R+4)-rhTop;
+  const viewW=rvX+rvEp+4;
+  const sc=targetW/viewW;
+
   ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(sc, sc);
+  ctx.translate(x,y);
+  ctx.scale(sc,sc);
+
   // Crochet bleu
   ctx.fillStyle="#1400FF";
-  ctx.fillRect(4,8,9,cy+r-8+6);
-  ctx.fillRect(4,cy+r-2,36,9);
-  // Cercles
-  [[cx0,"A"],[cx0+ep,"N"],[cx0+ep*2,"G"],[cx0+ep*3,"Y"]].forEach(([cx,l])=>{
-    ctx.strokeStyle=tc; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle=tc; ctx.font="900 18px Arial Black,Arial";
-    ctx.textAlign="center"; ctx.fillText(l,cx,cy+7);
+  ctx.fillRect(bvX, bvTop, bvEp, bvBot-bvTop);
+  ctx.fillRect(bvX, bvBot-bvEp, bhLen, bvEp);
+
+  // Cercles ANGY
+  [[cxA,"A"],[cxN,"N"],[cxG,"G"],[cxY,"Y"]].forEach(([cx,l])=>{
+    ctx.strokeStyle=tc; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle=tc; ctx.font="900 22px Arial Black,Arial";
+    ctx.textAlign="center"; ctx.fillText(l,cx,cy+9);
   });
+
   // Company
-  ctx.fillStyle=tc; ctx.font="900 28px Arial Black,Arial";
-  ctx.textAlign="left"; ctx.fillText("Company",compX,cy+9);
+  ctx.fillStyle=tc; ctx.font="900 36px Arial Black,Arial";
+  ctx.textAlign="left"; ctx.fillText("Company",compX,cy+11);
+
   // Crochet rouge
   ctx.fillStyle="#CC0000";
-  ctx.fillRect(rougeX,8,48,9);
-  ctx.fillRect(rougeX+39,8,9,36);
+  ctx.fillRect(rvX-rhLen+rvEp, rhTop, rhLen, rvEp);
+  ctx.fillRect(rvX, rhTop, rvEp, rvH);
+
   ctx.restore();
 }
 
@@ -113,7 +165,7 @@ function rr(ctx,x,y,w,h,r){
 }
 
 function drawVisual(canvas, cfg) {
-  const {produit,prix,specs,points,type,format,contact,localisation,instagram,facebook,tiktok} = cfg;
+  const {produit,prix,specs,points,type,format,contact,localisation,instagram,facebook,tiktok,photo} = cfg;
   const ctx = canvas.getContext("2d");
   const W = canvas.width, H = canvas.height;
   const typeObj = TYPES.find(t=>t.id===type)||TYPES[0];
@@ -126,14 +178,59 @@ function drawVisual(canvas, cfg) {
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0,0,W,H);
 
-  // ── CERCLE LUMINEUX fond (ambiance)
-  const glowGrad = ctx.createRadialGradient(W*0.75, H*0.15, 0, W*0.75, H*0.15, W*0.55);
-  glowGrad.addColorStop(0, "rgba(200,60,0,0.22)");
-  glowGrad.addColorStop(1, "transparent");
-  ctx.fillStyle = glowGrad;
-  ctx.fillRect(0,0,W,H);
+  // ── PHOTO PRODUIT EN ARRIÈRE-PLAN (si disponible)
+  if(photo) {
+    // Zone droite de l'affiche — photo grande en semi-transparent
+    const photoW = W*0.52;
+    const photoH = H*0.55;
+    const photoX = W*0.48;
+    const photoY = H*0.18;
+    ctx.save();
+    // Clip arrondi pour la photo
+    rr(ctx, photoX, photoY, photoW, photoH, W*0.03);
+    ctx.clip();
+    // Calculer ratio pour couvrir la zone
+    const scaleX = photoW / photo.width;
+    const scaleY = photoH / photo.height;
+    const scale = Math.max(scaleX, scaleY);
+    const dw = photo.width * scale;
+    const dh = photo.height * scale;
+    const dx = photoX + (photoW - dw) / 2;
+    const dy = photoY + (photoH - dh) / 2;
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(photo, dx, dy, dw, dh);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    // Dégradé sur la photo pour fondre avec le fond
+    const fadeGrad = ctx.createLinearGradient(photoX, 0, photoX+photoW, 0);
+    fadeGrad.addColorStop(0, "#0A0505");
+    fadeGrad.addColorStop(0.3, "transparent");
+    ctx.fillStyle = fadeGrad;
+    ctx.fillRect(photoX, photoY, photoW*0.4, photoH);
+    // Ombre bas de la photo
+    const fadeBot = ctx.createLinearGradient(0, photoY+photoH*0.7, 0, photoY+photoH);
+    fadeBot.addColorStop(0, "transparent");
+    fadeBot.addColorStop(1, "#0A0505");
+    ctx.fillStyle = fadeBot;
+    ctx.fillRect(photoX, photoY+photoH*0.7, photoW, photoH*0.3);
+  } else {
+    // Cercle lumineux fond sans photo
+    const glowGrad = ctx.createRadialGradient(W*0.75, H*0.35, 0, W*0.75, H*0.35, W*0.55);
+    glowGrad.addColorStop(0, "rgba(200,60,0,0.22)");
+    glowGrad.addColorStop(1, "transparent");
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0,0,W,H);
+    // Emoji produit grand en arrière-plan
+    const emojiSize = W*0.32;
+    ctx.font = `${emojiSize}px serif`;
+    ctx.textAlign = "center";
+    ctx.globalAlpha = 0.12;
+    ctx.fillText("📱", W*0.72, H*0.65);
+    ctx.globalAlpha = 1;
+  }
 
-  const glowGrad2 = ctx.createRadialGradient(W*0.2, H*0.8, 0, W*0.2, H*0.8, W*0.4);
+  // Lueur bleue gauche
+  const glowGrad2 = ctx.createRadialGradient(W*0.15, H*0.8, 0, W*0.15, H*0.8, W*0.4);
   glowGrad2.addColorStop(0, "rgba(0,80,200,0.15)");
   glowGrad2.addColorStop(1, "transparent");
   ctx.fillStyle = glowGrad2;
@@ -310,6 +407,9 @@ export default function App() {
   const [instagram, setInstagram] = useState("angy_company");
   const [facebook, setFacebook] = useState("Angy Company");
   const [tiktok, setTiktok] = useState("angycompany");
+  const [photo, setPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const photoInputRef = useRef();
   const [legende, setLegende] = useState("");
   const [loadingL, setLoadingL] = useState(false);
   const [planning, setPlanning] = useState(()=>JSON.parse(localStorage.getItem("angy_plan")||"[]"));
@@ -318,6 +418,15 @@ export default function App() {
   const [planHeure, setPlanHeure] = useState("18:00");
   const [planReseau, setPlanReseau] = useState("📘 Facebook");
   const [planNote, setPlanNote] = useState("");
+  // Animation
+  const [animRunning, setAnimRunning] = useState(false);
+  const [animProgress, setAnimProgress] = useState(0);
+  const [enregistrement, setEnregistrement] = useState(false);
+  const [animStyle, setAnimStyle] = useState("slide"); // slide, pulse, zoom
+  const animCanvasRef = useRef();
+  const animFrameRef = useRef();
+  const recorderRef = useRef();
+  const chunksRef = useRef([]);
   const [toast, setToast] = useState(null);
   const canvasRef = useRef();
   const showToast = m => { setToast(m); setTimeout(()=>setToast(null),2500); };
@@ -335,12 +444,28 @@ export default function App() {
     inputBorder:"rgba(0,0,0,0.12)", sel:"#F0F0FF",
   };
 
+  const handlePhoto = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    setPhotoPreview(url);
+    const img = new Image();
+    img.onload = () => setPhoto(img);
+    img.src = url;
+  };
+
+  const supprimerPhoto = () => {
+    setPhoto(null);
+    setPhotoPreview(null);
+    if(photoInputRef.current) photoInputRef.current.value = "";
+  };
+
   const dessiner = useCallback(()=>{
     const canvas = canvasRef.current;
     if(!canvas) return;
     canvas.width = fmt.w; canvas.height = fmt.h;
-    drawVisual(canvas,{produit,prix,specs,points,type,format,contact,localisation,instagram,facebook,tiktok});
-  },[produit,prix,specs,points,type,format,contact,localisation,instagram,facebook,tiktok,fmt]);
+    drawVisual(canvas,{produit,prix,specs,points,type,format,contact,localisation,instagram,facebook,tiktok,photo});
+  },[produit,prix,specs,points,type,format,contact,localisation,instagram,facebook,tiktok,fmt,photo]);
 
   useEffect(()=>{ dessiner(); },[dessiner]);
   useEffect(()=>{
@@ -372,6 +497,233 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
     setLoadingL(false);
   };
 
+  // ─── ANIMATION ──────────────────────────────────────────────────────────────
+  const drawAnimFrame = useCallback((canvas, t, style) => {
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    const pad = W * 0.06;
+
+    // Fond
+    const bgGrad = ctx.createRadialGradient(W*0.6, H*0.25, 0, W*0.5, H*0.5, W*0.9);
+    bgGrad.addColorStop(0, "#2A1A0A");
+    bgGrad.addColorStop(0.5, "#1A1010");
+    bgGrad.addColorStop(1, "#050505");
+    ctx.fillStyle = bgGrad; ctx.fillRect(0,0,W,H);
+
+    // Lueur animée
+    const glowAlpha = 0.15 + Math.sin(t*3)*0.07;
+    const glow = ctx.createRadialGradient(W*0.7,H*0.3,0,W*0.7,H*0.3,W*0.6);
+    glow.addColorStop(0,`rgba(200,60,0,${glowAlpha})`);
+    glow.addColorStop(1,"transparent");
+    ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+
+    const typeObj = TYPES.find(x=>x.id===type)||TYPES[0];
+
+    // LOGO — slide depuis gauche
+    const logoProgress = style==="slide" ? Math.min(1, t*2.5) : 1;
+    const logoEase = 1 - Math.pow(1-logoProgress, 3);
+    const logoX = -W*0.4 + W*0.4*logoEase + pad;
+    ctx.save(); ctx.globalAlpha = logoEase;
+    drawLogo(ctx, logoX, H*0.028, W*0.38, false);
+    ctx.restore();
+
+    // TITRE — fade + scale
+    const titreProgress = style==="zoom"
+      ? Math.min(1, Math.max(0, (t-0.1)*3))
+      : Math.min(1, Math.max(0, (t-0.15)*2.5));
+    const titreScale = style==="zoom" ? 0.5 + 0.5*titreProgress : 1;
+    const titreAlpha = titreProgress;
+    const titreFontSize = W*0.095;
+    const titreY = H*0.2;
+    ctx.save();
+    ctx.globalAlpha = titreAlpha;
+    ctx.translate(W/2, titreY);
+    ctx.scale(titreScale, titreScale);
+    ctx.translate(-W/2, -titreY);
+    const titreWords = typeObj.titre.split(" ");
+    const l1 = titreWords.slice(0,Math.ceil(titreWords.length/2)).join(" ");
+    const l2 = titreWords.slice(Math.ceil(titreWords.length/2)).join(" ");
+    ctx.font=`900 ${titreFontSize}px Arial Black,Arial`;
+    ctx.textAlign="center";
+    ctx.fillStyle=typeObj.ombre;
+    ctx.fillText(l1,W/2+5,titreY+5);
+    ctx.fillText(l2,W/2+5,titreY+titreFontSize*1.2+5);
+    ctx.strokeStyle="#000"; ctx.lineWidth=titreFontSize*0.07;
+    ctx.fillStyle=typeObj.couleurTitre;
+    ctx.strokeText(l1,W/2,titreY); ctx.fillText(l1,W/2,titreY);
+    ctx.strokeText(l2,W/2,titreY+titreFontSize*1.2); ctx.fillText(l2,W/2,titreY+titreFontSize*1.2);
+    ctx.restore();
+
+    // PRODUIT — slide depuis droite
+    const prodProgress = Math.min(1, Math.max(0,(t-0.25)*2.5));
+    const prodEase = 1-Math.pow(1-prodProgress,3);
+    const prodOffX = style==="slide" ? W*(1-prodEase)*0.3 : 0;
+    ctx.save(); ctx.globalAlpha = prodEase;
+    ctx.translate(prodOffX,0);
+    ctx.fillStyle=typeObj.couleurTitre;
+    ctx.font=`900 ${W*0.065}px Arial Black,Arial`;
+    ctx.textAlign="left";
+    ctx.fillText(produit, pad, H*0.41);
+    if(specs){
+      ctx.fillStyle="rgba(255,255,255,0.6)";
+      ctx.font=`${W*0.03}px Arial`;
+      ctx.fillText(specs, pad, H*0.41+W*0.04);
+    }
+    ctx.restore();
+
+    // PRIX — pulse animé
+    const prixProgress = Math.min(1, Math.max(0,(t-0.35)*2.5));
+    const prixPulse = style==="pulse"
+      ? 1 + Math.sin(t*8)*0.04*(prixProgress)
+      : 1;
+    ctx.save();
+    ctx.globalAlpha = prixProgress;
+    ctx.translate(pad + W*0.2, H*0.5);
+    ctx.scale(prixPulse, prixPulse);
+    ctx.translate(-(pad + W*0.2), -H*0.5);
+    // Halo derrière le prix
+    if(prixProgress>0.5){
+      const halo=ctx.createRadialGradient(pad+W*0.25,H*0.5,0,pad+W*0.25,H*0.5,W*0.25);
+      halo.addColorStop(0,`rgba(255,215,0,${0.12*prixProgress})`);
+      halo.addColorStop(1,"transparent");
+      ctx.fillStyle=halo; ctx.fillRect(0,H*0.44,W*0.55,H*0.14);
+    }
+    ctx.fillStyle="#FFD700";
+    ctx.font=`900 ${W*0.072}px Arial Black,Arial`;
+    ctx.textAlign="left";
+    ctx.fillText(prix+" FCFA", pad, H*0.52);
+    ctx.restore();
+
+    // POINTS — apparaissent un par un
+    points.slice(0,6).forEach((pt,i)=>{
+      const ptDelay = 0.45 + i*0.08;
+      const ptProgress = Math.min(1,Math.max(0,(t-ptDelay)*4));
+      const ptAlpha = ptProgress;
+      const ptOffX = style==="slide" ? W*0.08*(1-ptProgress) : 0;
+      const col = i%2===0 ? pad : W*0.52;
+      const row = Math.floor(i/2);
+      ctx.save();
+      ctx.globalAlpha = ptAlpha;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font=`600 ${W*0.03}px Arial`;
+      ctx.textAlign="left";
+      ctx.fillText(pt, col+ptOffX, H*0.58+row*W*0.055);
+      ctx.restore();
+    });
+
+    // CONTACT — fade in à la fin
+    const ctProgress = Math.min(1,Math.max(0,(t-0.75)*3));
+    ctx.save();
+    ctx.globalAlpha=ctProgress;
+    // Ligne séparatrice
+    const sepY=H*0.74;
+    const sepGrad=ctx.createLinearGradient(pad,sepY,W-pad,sepY);
+    sepGrad.addColorStop(0,"transparent");
+    sepGrad.addColorStop(0.2,"#1400FF");
+    sepGrad.addColorStop(0.8,"#CC0000");
+    sepGrad.addColorStop(1,"transparent");
+    ctx.strokeStyle=sepGrad; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(pad,sepY); ctx.lineTo(W-pad,sepY); ctx.stroke();
+    ctx.fillStyle="rgba(255,215,0,0.9)";
+    ctx.font=`700 ${W*0.028}px Arial`; ctx.textAlign="left";
+    ctx.fillText(`📞 ${contact}`, pad, H*0.78);
+    ctx.fillStyle="rgba(255,255,255,0.7)";
+    ctx.font=`${W*0.026}px Arial`;
+    ctx.fillText(`📍 ${localisation}`, pad, H*0.78+W*0.036);
+    // Réseaux sociaux
+    [`📸 ${instagram}`,`👥 ${facebook}`,`🎵 ${tiktok}`].forEach((r,i)=>{
+      ctx.fillStyle="rgba(255,255,255,0.75)";
+      ctx.fillText(r, W*0.52, H*0.78+i*W*0.036);
+    });
+    // Slogan
+    ctx.fillStyle="rgba(255,255,255,0.35)";
+    ctx.font=`${W*0.024}px Arial`; ctx.textAlign="center";
+    ctx.fillText("angy-company.vercel.app · Votre satisfaction, notre priorité.", W/2, H*0.94);
+    ctx.restore();
+
+    // PARTICULES (style pulse)
+    if(style==="pulse" && t>0.5){
+      for(let i=0;i<8;i++){
+        const angle=(i/8)*Math.PI*2+t*2;
+        const dist=W*0.08+Math.sin(t*3+i)*W*0.02;
+        const px=W/2+Math.cos(angle)*dist;
+        const py=H*0.52+Math.sin(angle)*dist*0.3;
+        ctx.fillStyle=`rgba(255,215,0,${0.4*Math.sin(t*4+i)})`;
+        ctx.beginPath(); ctx.arc(px,py,W*0.006,0,Math.PI*2); ctx.fill();
+      }
+    }
+  }, [produit,prix,specs,points,type,contact,localisation,instagram,facebook,tiktok]);
+
+  const lancerAnimation = useCallback(() => {
+    const canvas = animCanvasRef.current;
+    if(!canvas || animRunning) return;
+    const fmt = FORMATS.find(f=>f.id===format);
+    canvas.width = Math.round(fmt.w/2);
+    canvas.height = Math.round(fmt.h/2);
+    setAnimRunning(true);
+    setAnimProgress(0);
+    const duration = 3.5; // secondes
+    const fps = 30;
+    let frame = 0;
+    const totalFrames = duration*fps;
+    const tick = () => {
+      const t = Math.min(frame/totalFrames, 1);
+      drawAnimFrame(canvas, t, animStyle);
+      setAnimProgress(Math.round(t*100));
+      frame++;
+      if(frame<=totalFrames) {
+        animFrameRef.current = requestAnimationFrame(tick);
+      } else {
+        setAnimRunning(false);
+        setAnimProgress(100);
+      }
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+  }, [animRunning, format, animStyle, drawAnimFrame]);
+
+  const arreterAnimation = () => {
+    if(animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    setAnimRunning(false);
+  };
+
+  const exporterVideo = useCallback(() => {
+    const canvas = animCanvasRef.current;
+    if(!canvas || enregistrement) return;
+    const fmt = FORMATS.find(f=>f.id===format);
+    canvas.width = Math.round(fmt.w/2);
+    canvas.height = Math.round(fmt.h/2);
+    const stream = canvas.captureStream(30);
+    chunksRef.current = [];
+    const recorder = new MediaRecorder(stream, {mimeType:"video/webm;codecs=vp9"});
+    recorder.ondataavailable = e => { if(e.data.size>0) chunksRef.current.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, {type:"video/webm"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href=url; a.download=`ANGY_${produit.replace(/ /g,"_")}_video.webm`;
+      a.click(); URL.revokeObjectURL(url);
+      setEnregistrement(false);
+      showToast("✅ Vidéo téléchargée !");
+    };
+    recorderRef.current = recorder;
+    recorder.start();
+    setEnregistrement(true);
+    const duration=3.5, fps=30, totalFrames=duration*fps;
+    let frame=0;
+    const tick=()=>{
+      const t=Math.min(frame/totalFrames,1);
+      drawAnimFrame(canvas,t,animStyle);
+      frame++;
+      if(frame<=totalFrames) requestAnimationFrame(tick);
+      else recorder.stop();
+    };
+    requestAnimationFrame(tick);
+  },[enregistrement,format,produit,animStyle,drawAnimFrame]);
+
+  useEffect(()=>{
+    return ()=>{ if(animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
+  },[]);
+
   const css = {
     panel:{background:D.card,border:`1px solid ${D.border}`,borderRadius:16,padding:18,marginBottom:12},
     ptitle:{fontSize:11,fontWeight:700,color:D.muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12},
@@ -391,7 +743,7 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
       <header style={{background:dark?"rgba(8,8,15,0.97)":"rgba(240,240,248,0.97)",backdropFilter:"blur(20px)",borderBottom:`1px solid ${D.border}`,padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,gap:12}}>
         <AngyLogo width={150} light={!dark}/>
         <div style={{display:"flex",gap:6,overflowX:"auto"}}>
-          {[["creer","✨ Créer"],["planifier","📅 Planifier"],["historique","🗂 Historique"]].map(([id,lbl])=>(
+          {[["creer","✨ Créer"],["animer","🎬 Animer"],["scripts","🎤 Scripts"],["calendrier","📅 Calendrier"],["stats","📊 Stats"],["planifier","🗓 Planifier"],["historique","🗂 Historique"]].map(([id,lbl])=>(
             <button key={id} style={css.tab(tab===id)} onClick={()=>setTab(id)}>{lbl}</button>
           ))}
         </div>
@@ -453,6 +805,32 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
                 </div>
               </div>
 
+              {/* PHOTO */}
+              <div style={css.panel}>
+                <div style={css.ptitle}>📸 Photo du produit</div>
+                <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhoto} style={{display:"none"}}/>
+                {!photoPreview ? (
+                  <button onClick={()=>photoInputRef.current.click()}
+                    style={{width:"100%",padding:"20px",borderRadius:12,border:`2px dashed ${D.border}`,background:"transparent",color:D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:600,textAlign:"center",transition:"all 0.15s"}}>
+                    <div style={{fontSize:32,marginBottom:8}}>📸</div>
+                    Appuyez pour ajouter une photo<br/>
+                    <span style={{fontSize:11,fontWeight:400}}>JPG, PNG — votre iPhone, MacBook...</span>
+                  </button>
+                ) : (
+                  <div>
+                    <img src={photoPreview} alt="Produit" style={{width:"100%",borderRadius:12,objectFit:"cover",maxHeight:180,border:`1px solid ${D.border}`}}/>
+                    <div style={{display:"flex",gap:8,marginTop:8}}>
+                      <button onClick={()=>photoInputRef.current.click()} style={{flex:1,padding:"8px",borderRadius:9,background:D.input,border:`1px solid ${D.border}`,color:D.text,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}>
+                        🔄 Changer
+                      </button>
+                      <button onClick={supprimerPhoto} style={{flex:1,padding:"8px",borderRadius:9,background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",color:"#FF453A",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}>
+                        🗑 Supprimer
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* POINTS */}
               <div style={css.panel}>
                 <div style={css.ptitle}>Points clés (2 colonnes)</div>
@@ -511,7 +889,97 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
           </div>
         )}
 
-        {/* ══ PLANIFIER ══ */}
+        {/* ══ ANIMER ══ */}
+        {tab==="animer"&&(
+          <div style={{display:"grid",gridTemplateColumns:"clamp(280px,28%,340px) 1fr",gap:16,alignItems:"start"}}>
+            <div>
+              <div style={css.panel}>
+                <div style={css.ptitle}>🎬 Style d'animation</div>
+                {[
+                  {id:"slide",label:"Slide",desc:"Éléments glissent depuis les côtés",icon:"➡️"},
+                  {id:"pulse",label:"Pulse",desc:"Prix pulsant avec particules dorées",icon:"💫"},
+                  {id:"zoom",label:"Zoom",desc:"Titre apparaît en zoom depuis le centre",icon:"🔍"},
+                ].map(s=>(
+                  <button key={s.id} onClick={()=>setAnimStyle(s.id)}
+                    style={{width:"100%",padding:"12px 14px",borderRadius:11,border:`1px solid ${animStyle===s.id?"#1400FF":D.border}`,background:animStyle===s.id?"rgba(20,0,255,0.1)":"transparent",color:animStyle===s.id?"#6680FF":D.text,cursor:"pointer",fontFamily:"inherit",textAlign:"left",marginBottom:8,transition:"all 0.15s"}}>
+                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                      <span style={{fontSize:22}}>{s.icon}</span>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:13}}>{s.label}</div>
+                        <div style={{fontSize:11,color:D.muted,marginTop:2}}>{s.desc}</div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div style={css.panel}>
+                <div style={css.ptitle}>Format</div>
+                <select style={css.sel} value={format} onChange={e=>setFormat(e.target.value)}>
+                  {FORMATS.map(f=><option key={f.id} value={f.id}>{f.label} {f.ratio}</option>)}
+                </select>
+              </div>
+
+              <div style={css.panel}>
+                <div style={css.ptitle}>⚠️ Compatibilité</div>
+                <div style={{fontSize:12,color:D.muted,lineHeight:1.7}}>
+                  La vidéo est exportée en format <strong style={{color:D.text}}>WebM</strong> — compatible avec :<br/>
+                  ✅ Chrome, Firefox<br/>
+                  ✅ Android<br/>
+                  ⚠️ iOS Safari — ouvrir dans Chrome<br/><br/>
+                  Pour convertir en MP4 :<br/>
+                  → Importez dans <strong style={{color:D.text}}>CapCut</strong> et exportez en MP4
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
+                <div style={{fontWeight:800,fontSize:18}}>Aperçu animé</div>
+                <div style={{display:"flex",gap:8}}>
+                  {animRunning
+                    ?<button onClick={arreterAnimation} style={{background:"rgba(255,69,58,0.15)",border:"1px solid #FF453A",color:"#FF453A",padding:"9px 18px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>⏹ Arrêter</button>
+                    :<button onClick={lancerAnimation} style={{background:"rgba(20,0,255,0.15)",border:"1px solid #1400FF",color:"#6680FF",padding:"9px 18px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>▶️ Prévisualiser</button>
+                  }
+                  <button onClick={exporterVideo} disabled={enregistrement}
+                    style={{background:"linear-gradient(135deg,#CC0000,#FF4400)",color:"#fff",border:"none",padding:"9px 18px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:"inherit",opacity:enregistrement?0.7:1}}>
+                    {enregistrement?"⏳ Export...":"⬇️ Exporter WebM"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Barre de progression */}
+              {(animRunning||animProgress>0)&&(
+                <div style={{marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:D.muted,marginBottom:6}}>
+                    <span>{animRunning?"Animation en cours...":"Terminé ✅"}</span>
+                    <span>{animProgress}%</span>
+                  </div>
+                  <div style={{height:4,background:D.border,borderRadius:99,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${animProgress}%`,background:"linear-gradient(90deg,#1400FF,#CC0000)",borderRadius:99,transition:"width 0.1s"}}/>
+                  </div>
+                </div>
+              )}
+
+              <div style={{display:"flex",justifyContent:"center",background:dark?"repeating-conic-gradient(rgba(255,255,255,0.025) 0% 25%,transparent 0% 50%) 0 0/20px 20px":"repeating-conic-gradient(rgba(0,0,0,0.04) 0% 25%,transparent 0% 50%) 0 0/20px 20px",borderRadius:16,border:`1px solid ${D.border}`,padding:22}}>
+                <canvas ref={animCanvasRef} style={{borderRadius:12,maxWidth:"100%",maxHeight:560,objectFit:"contain",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}/>
+              </div>
+
+              <div style={{...css.panel,marginTop:14,borderLeft:"3px solid #FFD700"}}>
+                <div style={{...css.ptitle,color:"#FFD700"}}>💡 Workflow recommandé</div>
+                <div style={{fontSize:13,lineHeight:1.8,color:D.text}}>
+                  1️⃣ Prévisualisez l'animation<br/>
+                  2️⃣ Exportez en WebM<br/>
+                  3️⃣ Importez dans <strong>CapCut</strong><br/>
+                  4️⃣ Ajoutez musique + effets<br/>
+                  5️⃣ Exportez en MP4 → publiez sur TikTok ! 🚀
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
         {tab==="planifier"&&(
           <div style={{display:"grid",gridTemplateColumns:"clamp(280px,33%,400px) 1fr",gap:16,alignItems:"start"}}>
             <div>
@@ -612,6 +1080,327 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
             }
           </div>
         )}
+
+        {/* ══ SCRIPTS TIKTOK ══ */}
+        {tab==="scripts"&&(()=>{
+          const [scriptType, setScriptType] = useState("unboxing");
+          const [scriptProduit, setScriptProduit] = useState(produit);
+          const [scriptPrix, setScriptPrix] = useState(prix);
+          const [scriptResult, setScriptResult] = useState("");
+          const [scriptLoading, setScriptLoading] = useState(false);
+          const [legendeReseau, setLegendeReseau] = useState("tiktok");
+          const [legendeResult, setLegendeResult] = useState("");
+          const [legendeLoading, setLegendeLoading] = useState(false);
+
+          const SCRIPT_TYPES = [
+            {id:"unboxing", label:"📦 Unboxing", desc:"Déballer un iPhone en vidéo"},
+            {id:"comparaison", label:"⚖️ Comparaison", desc:"Comparer 2 modèles"},
+            {id:"conseil", label:"💡 Conseil", desc:"Éduquer sur les iPhone"},
+            {id:"temoignage", label:"⭐ Témoignage", desc:"Client satisfait"},
+            {id:"promo", label:"🔥 Promo flash", desc:"Offre limitée urgente"},
+            {id:"authentification", label:"🛡️ Authentification", desc:"Vrai vs faux iPhone"},
+          ];
+
+          const RESEAUX = [
+            {id:"tiktok", label:"🎵 TikTok", hashtags:"#iPhone #Dakar #Tech #ANGY #iPhoneSenegal #TechDakar #AngyCompany"},
+            {id:"instagram", label:"📸 Instagram", hashtags:"#iPhone #Dakar #TechSenegal #ANGY #iPhoneDakar #AngyCompany #Senegal"},
+            {id:"facebook", label:"📘 Facebook", hashtags:"#ANGY #iPhone #Dakar #TechSenegal"},
+            {id:"snapchat", label:"👻 Snapchat", hashtags:"#iPhone #Dakar #ANGY"},
+          ];
+
+          const genScript = async() => {
+            setScriptLoading(true); setScriptResult("");
+            const prompts = {
+              unboxing: `Écris un script TikTok de 30-45 secondes pour un unboxing de ${scriptProduit} à ${scriptPrix} FCFA vendu chez ANGY COMPANY à Dakar. Structure: ACCROCHE (0-3s) · PRÉSENTATION (3-15s) · DÉBALLAGE (15-30s) · PRIX ET CONTACT (30-45s). Style naturel sénégalais, enthousiaste. Contact: +221 78 116 32 86`,
+              comparaison: `Écris un script TikTok 30-45s pour comparer le ${scriptProduit} avec un modèle moins cher. Structure: ACCROCHE · DIFFÉRENCES CLÉS · LEQUEL CHOISIR · PRIX CHEZ ANGY. Style direct et éducatif. Contact: +221 78 116 32 86`,
+              conseil: `Écris un script TikTok 30-45s donnant 3 conseils pour bien choisir son iPhone, en mentionnant ANGY COMPANY Dakar comme vendeur de confiance. Contact: +221 78 116 32 86`,
+              temoignage: `Écris un script TikTok 30s simulant un témoignage de client satisfait d'ANGY COMPANY Dakar qui a acheté un ${scriptProduit}. Style authentique sénégalais. Contact: +221 78 116 32 86`,
+              promo: `Écris un script TikTok URGENT de 20-30s pour annoncer une promo flash sur ${scriptProduit} à ${scriptPrix} FCFA chez ANGY COMPANY Dakar. Crée maximum d'urgence. Contact: +221 78 116 32 86`,
+              authentification: `Écris un script TikTok éducatif 30-45s expliquant comment reconnaître un vrai iPhone d'une contrefaçon, en positionnant ANGY COMPANY comme vendeur certifié à Dakar. Contact: +221 78 116 32 86`,
+            };
+            try { setScriptResult(await callIA(prompts[scriptType]||prompts.unboxing)); }
+            catch { setScriptResult("Erreur — vérifiez votre connexion"); }
+            setScriptLoading(false);
+          };
+
+          const genLegende = async() => {
+            setLegendeLoading(true); setLegendeResult("");
+            const reseau = RESEAUX.find(r=>r.id===legendeReseau);
+            try {
+              setLegendeResult(await callIA(`Écris une légende optimisée pour ${reseau.label} pour vendre le ${scriptProduit} à ${scriptPrix} FCFA chez ANGY COMPANY Dakar. Contact: +221 78 116 32 86. Site: angy-company-site.vercel.app. Inclus ces hashtags: ${reseau.hashtags}. Style sénégalais naturel. Max 100 mots.`));
+            } catch { setLegendeResult("Erreur — vérifiez votre connexion"); }
+            setLegendeLoading(false);
+          };
+
+          return (
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              {/* SCRIPTS */}
+              <div>
+                <div style={css.panel}>
+                  <div style={css.ptitle}>🎤 Générateur de scripts TikTok</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+                    {SCRIPT_TYPES.map(s=>(
+                      <button key={s.id} onClick={()=>setScriptType(s.id)} style={{padding:"10px 8px",borderRadius:10,border:`1px solid ${scriptType===s.id?"#1400FF":D.border}`,background:scriptType===s.id?"rgba(20,0,255,0.12)":"transparent",color:scriptType===s.id?"#6680FF":D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700,textAlign:"center",transition:"all 0.15s"}}>
+                        <div style={{fontSize:18,marginBottom:3}}>{s.label.split(" ")[0]}</div>
+                        {s.label.split(" ").slice(1).join(" ")}<br/>
+                        <span style={{fontSize:10,fontWeight:400}}>{s.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{marginBottom:10}}>
+                    <label style={css.label}>Produit</label>
+                    <input style={css.input} value={scriptProduit} onChange={e=>setScriptProduit(e.target.value)}/>
+                  </div>
+                  <div style={{marginBottom:14}}>
+                    <label style={css.label}>Prix (FCFA)</label>
+                    <input style={css.input} value={scriptPrix} onChange={e=>setScriptPrix(e.target.value)}/>
+                  </div>
+                  <button style={css.btn("#CC0000")} onClick={genScript} disabled={scriptLoading}>
+                    {scriptLoading?"⏳ Génération...":"🎬 Générer le script"}
+                  </button>
+                  {scriptResult&&(
+                    <div style={{marginTop:14,background:D.input,borderRadius:12,padding:14,border:`1px solid ${D.border}`}}>
+                      <div style={{fontSize:11,fontWeight:700,color:"#CC0000",marginBottom:8,textTransform:"uppercase"}}>📝 Script prêt à filmer</div>
+                      <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:D.text}}>{scriptResult}</div>
+                      <button onClick={()=>{navigator.clipboard.writeText(scriptResult);showToast("✅ Script copié !");}} style={{marginTop:10,padding:"7px 14px",borderRadius:8,background:D.input,border:`1px solid ${D.border}`,color:D.text,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* LÉGENDES */}
+              <div>
+                <div style={css.panel}>
+                  <div style={css.ptitle}>📝 Légendes optimisées par réseau</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+                    {RESEAUX.map(r=>(
+                      <button key={r.id} onClick={()=>setLegendeReseau(r.id)} style={{padding:"8px 12px",borderRadius:10,border:`1px solid ${legendeReseau===r.id?"#1400FF":D.border}`,background:legendeReseau===r.id?"rgba(20,0,255,0.12)":"transparent",color:legendeReseau===r.id?"#6680FF":D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s"}}>
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button style={css.btn("#7700CC")} onClick={genLegende} disabled={legendeLoading}>
+                    {legendeLoading?"⏳ Génération...":"✍️ Générer la légende"}
+                  </button>
+                  {legendeResult&&(
+                    <div style={{marginTop:14,background:D.input,borderRadius:12,padding:14,border:`1px solid ${D.border}`}}>
+                      <div style={{fontSize:11,fontWeight:700,color:"#7700CC",marginBottom:8,textTransform:"uppercase"}}>
+                        ✍️ Légende {RESEAUX.find(r=>r.id===legendeReseau)?.label}
+                      </div>
+                      <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:D.text}}>{legendeResult}</div>
+                      <button onClick={()=>{navigator.clipboard.writeText(legendeResult);showToast("✅ Légende copiée !");}} style={{marginTop:10,padding:"7px 14px",borderRadius:8,background:D.input,border:`1px solid ${D.border}`,color:D.text,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* HASHTAGS */}
+                <div style={css.panel}>
+                  <div style={css.ptitle}>🏷️ Hashtags optimisés</div>
+                  {RESEAUX.map(r=>(
+                    <div key={r.id} style={{marginBottom:12,padding:"10px 12px",background:D.input,borderRadius:10,border:`1px solid ${D.border}`}}>
+                      <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>{r.label}</div>
+                      <div style={{fontSize:11,color:D.muted,lineHeight:1.8}}>{r.hashtags}</div>
+                      <button onClick={()=>{navigator.clipboard.writeText(r.hashtags);showToast("✅ Hashtags copiés !");}} style={{marginTop:6,padding:"4px 10px",borderRadius:7,background:"transparent",border:`1px solid ${D.border}`,color:D.muted,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ══ CALENDRIER 30 JOURS ══ */}
+        {tab==="calendrier"&&(()=>{
+          const JOURS = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+          const CONTENU_PAR_JOUR = [
+            {jour:"Lundi",   icon:"📦", type:"Unboxing",      reseau:"TikTok",    desc:"Déballez un iPhone du stock"},
+            {jour:"Mardi",   icon:"⚖️", type:"Comparaison",   reseau:"Instagram", desc:"Comparez 2 modèles iPhone"},
+            {jour:"Mercredi",icon:"💬", type:"Témoignage",    reseau:"Facebook",  desc:"Partagez un avis client"},
+            {jour:"Jeudi",   icon:"💡", type:"Conseil tech",  reseau:"TikTok",    desc:"3 conseils pour choisir"},
+            {jour:"Vendredi",icon:"💰", type:"Prix du jour",  reseau:"Facebook",  desc:"Publiez les dispo du jour"},
+            {jour:"Samedi",  icon:"🔥", type:"Promo flash",   reseau:"Instagram", desc:"Offre spéciale weekend"},
+            {jour:"Dimanche",icon:"📸", type:"Story du jour", reseau:"WhatsApp",  desc:"Votre journée de vendeur"},
+          ];
+
+          const semaines = Array.from({length:4},(_,s)=>
+            CONTENU_PAR_JOUR.map((c,j)=>({
+              ...c,
+              jour:`J${s*7+j+1} — ${c.jour}`,
+              semaine: s+1,
+            }))
+          ).flat();
+
+          return (
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <div>
+                  <div style={{fontWeight:800,fontSize:20}}>📅 Calendrier de contenu — 30 jours</div>
+                  <div style={{fontSize:13,color:D.muted,marginTop:4}}>Plan de publication complet pour exploser sur les réseaux</div>
+                </div>
+              </div>
+              {[1,2,3,4].map(sem=>(
+                <div key={sem} style={{...css.panel,marginBottom:16}}>
+                  <div style={{...css.ptitle,color:"#1400FF"}}>Semaine {sem} — Objectif : {sem===1?"Lancer":sem===2?"Accélérer":sem===3?"Engager":"Convertir"}</div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:8}}>
+                    {semaines.filter(j=>j.semaine===sem).map((j,i)=>(
+                      <div key={i} style={{background:D.input,borderRadius:12,padding:"10px 8px",border:`1px solid ${D.border}`,textAlign:"center"}}>
+                        <div style={{fontSize:20,marginBottom:4}}>{j.icon}</div>
+                        <div style={{fontSize:10,fontWeight:700,color:D.muted,marginBottom:4}}>{j.jour}</div>
+                        <div style={{fontSize:11,fontWeight:700,color:D.text,marginBottom:3}}>{j.type}</div>
+                        <div style={{fontSize:10,color:"#1400FF",fontWeight:600,marginBottom:4}}>{j.reseau}</div>
+                        <div style={{fontSize:10,color:D.muted,lineHeight:1.4}}>{j.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* CONSEILS */}
+              <div style={css.panel}>
+                <div style={css.ptitle}>💡 Règles d'or pour exploser</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                  {[
+                    ["🕐","Publiez aux bons horaires","7h · 12h · 18h-21h à Dakar"],
+                    ["👤","Montrez votre visage","Les gens achètent à des personnes"],
+                    ["💬","Répondez à TOUS les commentaires","L'algorithme adore ça"],
+                    ["🔄","Recyclez votre contenu","1 vidéo TikTok = 1 Reel = 1 Facebook"],
+                    ["📈","Soyez régulier","1 post/jour minimum"],
+                    ["🎯","Utilisez les tendances","Sons TikTok populaires du moment"],
+                  ].map(([icon,titre,desc])=>(
+                    <div key={titre} style={{background:D.input,borderRadius:10,padding:"12px 14px",border:`1px solid ${D.border}`,display:"flex",gap:10,alignItems:"flex-start"}}>
+                      <span style={{fontSize:22,flexShrink:0}}>{icon}</span>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:13}}>{titre}</div>
+                        <div style={{fontSize:11,color:D.muted,marginTop:3}}>{desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ══ STATS ══ */}
+        {tab==="stats"&&(()=>{
+          const [stats, setStats] = useState(()=>JSON.parse(localStorage.getItem("angy_stats")||JSON.stringify({
+            semaines:[],
+            facebook:0, instagram:0, tiktok:0, snapchat:0,
+            ventesParSemaine:0, messagesParJour:0,
+          })));
+
+          const sauvegarder=(newStats)=>{
+            setStats(newStats);
+            localStorage.setItem("angy_stats",JSON.stringify(newStats));
+            showToast("✅ Stats sauvegardées !");
+          };
+
+          const ajouterSemaine=()=>{
+            const sem={
+              id:Date.now(),
+              semaine:`Semaine ${stats.semaines.length+1}`,
+              date:new Date().toLocaleDateString("fr-FR"),
+              facebook:stats.facebook,
+              instagram:stats.instagram,
+              tiktok:stats.tiktok,
+              ventes:stats.ventesParSemaine,
+              messages:stats.messagesParJour,
+            };
+            sauvegarder({...stats,semaines:[...stats.semaines,sem]});
+          };
+
+          const objetifs = {facebook:1000, instagram:800, tiktok:2000, ventes:15};
+
+          return (
+            <div>
+              <div style={{fontWeight:800,fontSize:20,marginBottom:16}}>📊 Suivi des performances</div>
+
+              {/* SAISIE STATS */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+                <div style={css.panel}>
+                  <div style={css.ptitle}>📱 Abonnés actuels</div>
+                  {[
+                    ["📘 Facebook","facebook","#1877F2",objetifs.facebook],
+                    ["📸 Instagram","instagram","#E1306C",objetifs.instagram],
+                    ["🎵 TikTok","tiktok","#000000",objetifs.tiktok],
+                    ["👻 Snapchat","snapchat","#FFD700",500],
+                  ].map(([label,key,color,obj])=>(
+                    <div key={key} style={{marginBottom:14}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                        <label style={{...css.label,marginBottom:0}}>{label}</label>
+                        <span style={{fontSize:11,color:D.muted}}>Objectif: {obj.toLocaleString()}</span>
+                      </div>
+                      <input type="number" style={css.input} value={stats[key]||0}
+                        onChange={e=>setStats({...stats,[key]:Number(e.target.value)})}/>
+                      <div style={{height:4,background:D.border,borderRadius:99,marginTop:6,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${Math.min(100,Math.round(((stats[key]||0)/obj)*100))}%`,background:color,borderRadius:99,transition:"width 0.5s"}}/>
+                      </div>
+                      <div style={{fontSize:10,color:D.muted,marginTop:3,textAlign:"right"}}>
+                        {Math.min(100,Math.round(((stats[key]||0)/obj)*100))}% de l'objectif
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={css.panel}>
+                  <div style={css.ptitle}>💰 Ventes & Messages</div>
+                  <div style={{marginBottom:14}}>
+                    <label style={css.label}>Ventes cette semaine</label>
+                    <input type="number" style={css.input} value={stats.ventesParSemaine||0}
+                      onChange={e=>setStats({...stats,ventesParSemaine:Number(e.target.value)})}/>
+                    <div style={{height:4,background:D.border,borderRadius:99,marginTop:6,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${Math.min(100,Math.round(((stats.ventesParSemaine||0)/15)*100))}%`,background:"#00E676",borderRadius:99}}/>
+                    </div>
+                    <div style={{fontSize:10,color:D.muted,marginTop:3,textAlign:"right"}}>Objectif: 15/semaine</div>
+                  </div>
+                  <div style={{marginBottom:14}}>
+                    <label style={css.label}>Messages par jour</label>
+                    <input type="number" style={css.input} value={stats.messagesParJour||0}
+                      onChange={e=>setStats({...stats,messagesParJour:Number(e.target.value)})}/>
+                    <div style={{height:4,background:D.border,borderRadius:99,marginTop:6,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${Math.min(100,Math.round(((stats.messagesParJour||0)/50)*100))}%`,background:"#FF9F0A",borderRadius:99}}/>
+                    </div>
+                    <div style={{fontSize:10,color:D.muted,marginTop:3,textAlign:"right"}}>Objectif: 50/jour</div>
+                  </div>
+                  <button style={css.btn()} onClick={()=>sauvegarder(stats)}>💾 Sauvegarder</button>
+                  <button style={css.btnSec} onClick={ajouterSemaine}>📸 Snapshot semaine</button>
+                </div>
+              </div>
+
+              {/* HISTORIQUE SEMAINES */}
+              {stats.semaines.length>0&&(
+                <div style={css.panel}>
+                  <div style={css.ptitle}>📈 Progression semaine par semaine</div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                      <thead>
+                        <tr>
+                          {["Semaine","Date","Facebook","Instagram","TikTok","Ventes","Messages"].map(h=>(
+                            <th key={h} style={{padding:"8px 12px",textAlign:"left",borderBottom:`1px solid ${D.border}`,color:D.muted,fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.semaines.map((s,i)=>(
+                          <tr key={s.id} style={{borderBottom:`1px solid ${D.border}`}}>
+                            <td style={{padding:"8px 12px",fontWeight:700}}>{s.semaine}</td>
+                            <td style={{padding:"8px 12px",color:D.muted}}>{s.date}</td>
+                            <td style={{padding:"8px 12px",color:"#1877F2",fontWeight:600}}>{s.facebook}</td>
+                            <td style={{padding:"8px 12px",color:"#E1306C",fontWeight:600}}>{s.instagram}</td>
+                            <td style={{padding:"8px 12px",color:"#000",fontWeight:600}}>{s.tiktok}</td>
+                            <td style={{padding:"8px 12px",color:"#00E676",fontWeight:700}}>{s.ventes}</td>
+                            <td style={{padding:"8px 12px",color:"#FF9F0A",fontWeight:600}}>{s.messages}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
       </div>
 
       {/* TOAST */}
