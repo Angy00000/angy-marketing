@@ -1,5 +1,536 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
+// ─── CONSTANTES ÉDITEUR ───────────────────────────────────────────────────────
+const FONTS = ["Arial Black","Arial","Georgia","Impact","Verdana","Trebuchet MS","Courier New"];
+const STICKERS_LIST = ["📱","💻","🎧","📲","🔥","⚡","✅","🚚","💳","🛡️","⭐","👑","💰","🎉","🏆","❤️","💎","🇸🇳"];
+let _nextId = 1;
+const uid = () => `el_${_nextId++}`;
+
+// ─── EDITEUR VISUEL COMPONENT ─────────────────────────────────────────────────
+function EditeurVisuel() {
+  const D = {
+    bg:"#08080F", card:"#111120", border:"rgba(255,255,255,0.08)",
+    text:"#F0F0F8", muted:"#8899BB", input:"rgba(255,255,255,0.06)",
+    inputBorder:"rgba(255,255,255,0.12)", sel:"#181828",
+  };
+
+  const FMT_LIST = [
+    {id:"story",   label:"📱 Story 9:16",   w:1080, h:1920},
+    {id:"carre",   label:"⬛ Carré 1:1",    w:1080, h:1080},
+    {id:"paysage", label:"🖥 Paysage 16:9", w:1920, h:1080},
+  ];
+  const BG_LIST = [
+    {id:"sombre",   label:"Sombre",   bg:"linear-gradient(135deg,#1A0A00,#2A1500)"},
+    {id:"noir",     label:"Noir",     bg:"#0A0A0F"},
+    {id:"bleu",     label:"Bleu",     bg:"linear-gradient(135deg,#000080,#1400FF)"},
+    {id:"rouge",    label:"Rouge",    bg:"linear-gradient(135deg,#1A0000,#CC0000)"},
+    {id:"grad",     label:"Dégradé",  bg:"linear-gradient(135deg,#1400FF,#CC0000)"},
+    {id:"or",       label:"Or",       bg:"linear-gradient(135deg,#1A1500,#3D2D00)"},
+    {id:"violet",   label:"Violet",   bg:"linear-gradient(135deg,#1A0030,#7700CC)"},
+    {id:"vert",     label:"Vert",     bg:"linear-gradient(135deg,#001A0A,#005522)"},
+    {id:"blanc",    label:"Blanc",    bg:"#FFFFFF"},
+  ];
+
+  const [fmt, setFmt] = useState("story");
+  const [bgId, setBgId] = useState("sombre");
+  const [bgPhotoUrl, setBgPhotoUrl] = useState(null);
+  const [bgPhotoImg, setBgPhotoImg] = useState(null);
+  const [leftTab, setLeftTab] = useState("ajouter");
+  const [dragging, setDragging] = useState(null);
+  const [dragOffset, setDragOffset] = useState({x:0,y:0});
+  const [selected, setSelected] = useState(null);
+  const bgPhotoRef = useRef();
+  const imageInputRef = useRef();
+  const canvasRef = useRef();
+  const previewRef = useRef();
+  const toastRef = useRef();
+
+  const [elements, setElements] = useState([
+    {id:uid(),type:"text",x:0.07,y:0.10,text:"ANGY COMPANY",font:"Arial Black",size:54,color:"#FFFFFF",bold:true,italic:false,opacity:1,rotation:0,shadow:true,align:"left"},
+    {id:uid(),type:"text",x:0.07,y:0.38,text:"iPhone 15 Pro Max",font:"Arial Black",size:60,color:"#FFD700",bold:true,italic:false,opacity:1,rotation:0,shadow:true,align:"left"},
+    {id:uid(),type:"text",x:0.07,y:0.50,text:"850 000 FCFA",font:"Arial Black",size:68,color:"#FFFFFF",bold:true,italic:false,opacity:1,rotation:0,shadow:true,align:"left"},
+    {id:uid(),type:"text",x:0.07,y:0.64,text:"✅ Authentique · 🚚 Livraison Dakar",font:"Arial",size:28,color:"rgba(255,255,255,0.85)",bold:false,italic:false,opacity:1,rotation:0,shadow:false,align:"left"},
+    {id:uid(),type:"text",x:0.07,y:0.86,text:"+221 78 116 32 86",font:"Arial",size:28,color:"#FFD700",bold:true,italic:false,opacity:1,rotation:0,shadow:false,align:"left"},
+  ]);
+
+  const fmtObj = FMT_LIST.find(f=>f.id===fmt);
+  const PREV_H = Math.round(window.innerHeight * 0.72) || 640;
+  const PREV_W = Math.round(PREV_H*(fmtObj.w/fmtObj.h));
+  const scaleY = fmtObj.h/PREV_H;
+
+  const selEl = elements.find(e=>e.id===selected);
+  const updEl = (id,p) => setElements(prev=>prev.map(e=>e.id===id?{...e,...p}:e));
+  const delEl = (id) => { setElements(prev=>prev.filter(e=>e.id!==id)); setSelected(null); };
+
+  const addText = () => {
+    const el={id:uid(),type:"text",x:0.1,y:0.5,text:"Nouveau texte",font:"Arial Black",size:40,color:"#FFFFFF",bold:true,italic:false,opacity:1,rotation:0,shadow:false,align:"left"};
+    setElements(p=>[...p,el]); setSelected(el.id); setLeftTab("calques");
+  };
+
+  const addSticker = (s) => {
+    const el={id:uid(),type:"sticker",x:0.4,y:0.4,text:s,size:80,opacity:1,rotation:0};
+    setElements(p=>[...p,el]); setSelected(el.id);
+  };
+
+  const addImage = (file) => {
+    const url=URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      // Calcule les proportions pour bien remplir le canvas
+      const ratio = img.width / img.height;
+      const fmtRatio = fmtObj.w / fmtObj.h;
+      let w, h;
+      if(ratio > fmtRatio) { w=0.9; h=0.9/ratio*fmtRatio; }
+      else { h=0.9; w=0.9*ratio/fmtRatio; }
+      const el={id:uid(),type:"image",x:(1-w)/2,y:(1-h)/2,w,h,src:url,opacity:1,rotation:0};
+      // Ajoute EN PREMIER (en dessous de tout) pour que les textes restent visibles
+      setElements(p=>[el,...p]);
+      setSelected(el.id);
+    };
+    img.src = url;
+  };
+
+  const getBgStyle = () => {
+    if(bgPhotoUrl) return {backgroundImage:`url(${bgPhotoUrl})`,backgroundSize:"cover",backgroundPosition:"center"};
+    const bg=BG_LIST.find(b=>b.id===bgId);
+    return {background:bg?.bg||"#0A0A0F"};
+  };
+
+  // Drag
+  const startDrag = (e,id,isTouch=false) => {
+    e.stopPropagation();
+    setSelected(id);
+    const rect=previewRef.current.getBoundingClientRect();
+    const el=elements.find(x=>x.id===id);
+    const cx=isTouch?e.touches[0].clientX:e.clientX;
+    const cy=isTouch?e.touches[0].clientY:e.clientY;
+    setDragging(id);
+    setDragOffset({x:(cx-rect.left)/PREV_W-el.x,y:(cy-rect.top)/PREV_H-el.y});
+  };
+
+  const onMove = useCallback((e,isTouch=false) => {
+    if(!dragging) return;
+    const rect=previewRef.current?.getBoundingClientRect();
+    if(!rect) return;
+    const cx=isTouch?e.touches[0].clientX:e.clientX;
+    const cy=isTouch?e.touches[0].clientY:e.clientY;
+    const nx=Math.max(0,Math.min(0.95,(cx-rect.left)/PREV_W-dragOffset.x));
+    const ny=Math.max(0,Math.min(0.95,(cy-rect.top)/PREV_H-dragOffset.y));
+    updEl(dragging,{x:nx,y:ny});
+  },[dragging,dragOffset,PREV_W,PREV_H]);
+
+  useEffect(()=>{
+    const mm=e=>onMove(e);
+    const tm=e=>{e.preventDefault();onMove(e,true);};
+    const mu=()=>setDragging(null);
+    window.addEventListener("mousemove",mm);
+    window.addEventListener("mouseup",mu);
+    window.addEventListener("touchmove",tm,{passive:false});
+    window.addEventListener("touchend",mu);
+    return ()=>{
+      window.removeEventListener("mousemove",mm);
+      window.removeEventListener("mouseup",mu);
+      window.removeEventListener("touchmove",tm);
+      window.removeEventListener("touchend",mu);
+    };
+  },[onMove]);
+
+  const showToast = (msg) => {
+    if(toastRef.current){
+      toastRef.current.textContent=msg;
+      toastRef.current.style.opacity="1";
+      setTimeout(()=>{if(toastRef.current)toastRef.current.style.opacity="0";},2500);
+    }
+  };
+
+  const exporter = () => {
+    const canvas=canvasRef.current;
+    canvas.width=fmtObj.w; canvas.height=fmtObj.h;
+    const ctx=canvas.getContext("2d");
+    if(bgPhotoImg){
+      ctx.drawImage(bgPhotoImg,0,0,fmtObj.w,fmtObj.h);
+    } else {
+      const bg=BG_LIST.find(b=>b.id===bgId);
+      const bgStr=bg?.bg||"#0A0A0F";
+      if(bgStr.includes("gradient")){
+        const colors=bgStr.match(/#[A-Fa-f0-9]{6}/g)||["#111","#333"];
+        const g=ctx.createLinearGradient(0,0,fmtObj.w,fmtObj.h);
+        g.addColorStop(0,colors[0]); g.addColorStop(1,colors[1]);
+        ctx.fillStyle=g;
+      } else { ctx.fillStyle=bgStr; }
+      ctx.fillRect(0,0,fmtObj.w,fmtObj.h);
+    }
+    elements.forEach(el=>{
+      ctx.save(); ctx.globalAlpha=el.opacity??1;
+      const ex=el.x*fmtObj.w, ey=el.y*fmtObj.h;
+      if(el.rotation){ctx.translate(ex,ey);ctx.rotate(el.rotation*Math.PI/180);ctx.translate(-ex,-ey);}
+      if(el.type==="text"){
+        const w=el.bold?"900":"400",s=el.italic?"italic":"normal";
+        ctx.font=`${s} ${w} ${el.size}px "${el.font}",Arial`;
+        ctx.fillStyle=el.color; ctx.textAlign=el.align||"left";
+        if(el.shadow){ctx.shadowColor="rgba(0,0,0,0.9)";ctx.shadowBlur=10;ctx.shadowOffsetX=3;ctx.shadowOffsetY=3;}
+        ctx.fillText(el.text,ex,ey);
+      } else if(el.type==="sticker"){
+        ctx.font=`${el.size}px serif`; ctx.textAlign="center";
+        ctx.fillText(el.text,ex,ey);
+      } else if(el.type==="image"){
+        const img=new Image(); img.src=el.src;
+        if(img.complete) ctx.drawImage(img,ex,ey,el.w*fmtObj.w,el.h*fmtObj.h);
+      }
+      ctx.restore();
+    });
+    const a=document.createElement("a");
+    a.download=`ANGY_${fmt}.png`;
+    a.href=canvas.toDataURL("image/png"); a.click();
+    showToast("✅ Visuel téléchargé !");
+  };
+
+  const moveLayer = (id,dir) => {
+    setElements(prev=>{
+      const i=prev.findIndex(e=>e.id===id);
+      if(dir==="up"&&i<prev.length-1){const a=[...prev];[a[i],a[i+1]]=[a[i+1],a[i]];return a;}
+      if(dir==="down"&&i>0){const a=[...prev];[a[i],a[i-1]]=[a[i-1],a[i]];return a;}
+      return prev;
+    });
+  };
+
+  const dupliquer = (id) => {
+    const el=elements.find(e=>e.id===id);
+    if(!el) return;
+    const newEl={...el,id:uid(),x:el.x+0.03,y:el.y+0.03};
+    setElements(p=>[...p,newEl]); setSelected(newEl.id);
+  };
+
+  // Styles helpers
+  const S = {
+    panel: {background:D.card,border:`1px solid ${D.border}`,borderRadius:14,padding:16,marginBottom:12},
+    label: {display:"block",fontSize:11,fontWeight:600,color:D.muted,marginBottom:6,letterSpacing:"0.03em"},
+    input: {width:"100%",background:D.input,border:`1px solid ${D.inputBorder}`,borderRadius:9,padding:"9px 12px",color:D.text,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box"},
+    section: {fontSize:11,fontWeight:700,color:D.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10,marginTop:4},
+    btn: (active,color="#1400FF") => ({padding:"8px 0",borderRadius:9,border:`1px solid ${active?color:D.border}`,background:active?`${color}20`:"transparent",color:active?color:D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s"}),
+  };
+
+  return (
+    <div style={{background:D.bg,color:D.text,fontFamily:"inherit",borderRadius:16,border:`1px solid ${D.border}`,overflow:"hidden",minHeight:700}}>
+
+      {/* BARRE D'OUTILS PRINCIPALE */}
+      <div style={{background:D.card,borderBottom:`1px solid ${D.border}`,padding:"12px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+        <div style={{fontWeight:800,fontSize:15,color:D.text}}>🎨 Éditeur Visuel</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {/* Format rapide */}
+          {FMT_LIST.map(f=>(
+            <button key={f.id} onClick={()=>setFmt(f.id)} style={{padding:"6px 12px",borderRadius:9,border:`1px solid ${fmt===f.id?"#00E676":D.border}`,background:fmt===f.id?"rgba(0,230,118,0.1)":"transparent",color:fmt===f.id?"#00E676":D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700,transition:"all 0.15s"}}>
+              {f.label}
+            </button>
+          ))}
+          <div style={{width:1,background:D.border,margin:"0 4px"}}/>
+          <button onClick={exporter} style={{padding:"8px 20px",borderRadius:10,background:"linear-gradient(135deg,#1400FF,#7700CC)",color:"#fff",border:"none",fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:"inherit",boxShadow:"0 4px 14px rgba(20,0,255,0.3)"}}>
+            ⬇️ Exporter PNG
+          </button>
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"240px 1fr 290px",height:"calc(100vh - 110px)",overflow:"hidden"}}>
+
+        {/* ═══ PANNEAU GAUCHE ═══ */}
+        <div style={{background:D.card,borderRight:`1px solid ${D.border}`,overflowY:"auto",height:"100%"}}>
+
+          {/* Tabs gauche */}
+          <div style={{display:"flex",borderBottom:`1px solid ${D.border}`}}>
+            {[["ajouter","➕"],["calques","📋"],["fond","🎨"]].map(([id,icon])=>(
+              <button key={id} onClick={()=>setLeftTab(id)} style={{flex:1,padding:"12px 6px",border:"none",background:leftTab===id?"rgba(20,0,255,0.1)":"transparent",color:leftTab===id?"#6680FF":D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700,borderBottom:leftTab===id?"2px solid #1400FF":"2px solid transparent"}}>
+                {icon}
+              </button>
+            ))}
+          </div>
+
+          <div style={{padding:14}}>
+
+            {/* AJOUTER */}
+            {leftTab==="ajouter"&&(
+              <div>
+                <div style={S.section}>Éléments</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+                  <button onClick={addText} style={{padding:"14px 8px",borderRadius:12,border:`1px solid ${D.border}`,background:D.input,color:D.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,textAlign:"center",transition:"all 0.15s"}}>
+                    <div style={{fontSize:26,marginBottom:6}}>🔤</div>Texte
+                  </button>
+                  <button onClick={()=>imageInputRef.current.click()} style={{padding:"14px 8px",borderRadius:12,border:`1px solid ${D.border}`,background:D.input,color:D.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,textAlign:"center",transition:"all 0.15s"}}>
+                    <div style={{fontSize:26,marginBottom:6}}>🖼️</div>Photo
+                  </button>
+                </div>
+                <input ref={imageInputRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&addImage(e.target.files[0])}/>
+
+                <div style={S.section}>Stickers</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6}}>
+                  {STICKERS_LIST.map(s=>(
+                    <button key={s} onClick={()=>addSticker(s)} style={{padding:"8px 4px",borderRadius:9,border:`1px solid ${D.border}`,background:D.input,cursor:"pointer",fontSize:22,lineHeight:1,textAlign:"center",transition:"all 0.15s"}}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* CALQUES */}
+            {leftTab==="calques"&&(
+              <div>
+                <div style={S.section}>Calques ({elements.length})</div>
+                {elements.length===0&&<div style={{textAlign:"center",padding:"2rem",color:D.muted,fontSize:12}}>Aucun élément</div>}
+                {[...elements].reverse().map((el,i)=>(
+                  <div key={el.id} onClick={()=>setSelected(el.id)}
+                    style={{display:"flex",alignItems:"center",gap:8,padding:"10px 10px",borderRadius:10,border:`1px solid ${selected===el.id?"#1400FF":D.border}`,background:selected===el.id?"rgba(20,0,255,0.1)":D.input,cursor:"pointer",marginBottom:6,transition:"all 0.15s"}}>
+                    <span style={{fontSize:16,flexShrink:0}}>{el.type==="text"?"🔤":el.type==="sticker"?"😀":"🖼️"}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:D.text}}>{el.text||"Image"}</div>
+                      <div style={{fontSize:10,color:D.muted,marginTop:2}}>{el.type}</div>
+                    </div>
+                    <div style={{display:"flex",gap:3,flexShrink:0}}>
+                      <button onClick={e=>{e.stopPropagation();moveLayer(el.id,"up");}} style={{background:"none",border:`1px solid ${D.border}`,borderRadius:5,color:D.muted,cursor:"pointer",fontSize:11,padding:"2px 5px",fontFamily:"inherit"}}>↑</button>
+                      <button onClick={e=>{e.stopPropagation();moveLayer(el.id,"down");}} style={{background:"none",border:`1px solid ${D.border}`,borderRadius:5,color:D.muted,cursor:"pointer",fontSize:11,padding:"2px 5px",fontFamily:"inherit"}}>↓</button>
+                      <button onClick={e=>{e.stopPropagation();delEl(el.id);}} style={{background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",borderRadius:5,color:"#FF453A",cursor:"pointer",fontSize:11,padding:"2px 5px",fontFamily:"inherit"}}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* FOND */}
+            {leftTab==="fond"&&(
+              <div>
+                <div style={S.section}>Couleur de fond</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+                  {BG_LIST.map(bg=>(
+                    <button key={bg.id} onClick={()=>{setBgId(bg.id);setBgPhotoUrl(null);setBgPhotoImg(null);}}
+                      style={{padding:"14px 6px",borderRadius:10,border:`2px solid ${bgId===bg.id&&!bgPhotoUrl?"#1400FF":D.border}`,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700,textAlign:"center",color:bg.id==="blanc"?"#0A0A0F":"#FFFFFF",background:bg.bg,transition:"all 0.15s"}}>
+                      {bg.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={S.section}>Photo de fond</div>
+                <input ref={bgPhotoRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+                  const file=e.target.files[0]; if(!file) return;
+                  const url=URL.createObjectURL(file);
+                  setBgPhotoUrl(url);
+                  const img=new Image(); img.onload=()=>setBgPhotoImg(img); img.src=url;
+                }}/>
+                {bgPhotoUrl
+                  ?<div>
+                    <img src={bgPhotoUrl} style={{width:"100%",borderRadius:10,objectFit:"cover",height:100,marginBottom:8,border:`1px solid ${D.border}`}}/>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>bgPhotoRef.current.click()} style={{flex:1,padding:"8px",borderRadius:9,background:D.input,border:`1px solid ${D.border}`,color:D.text,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}>🔄 Changer</button>
+                      <button onClick={()=>{setBgPhotoUrl(null);setBgPhotoImg(null);}} style={{flex:1,padding:"8px",borderRadius:9,background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",color:"#FF453A",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}>🗑 Sup.</button>
+                    </div>
+                  </div>
+                  :<button onClick={()=>bgPhotoRef.current.click()} style={{width:"100%",padding:"20px",borderRadius:12,border:`2px dashed ${D.border}`,background:"transparent",color:D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600,textAlign:"center"}}>
+                    <div style={{fontSize:30,marginBottom:8}}>📸</div>
+                    Importer une photo de fond
+                  </button>
+                }
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ═══ CANVAS CENTRAL ═══ */}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",padding:"14px 12px",background:"#060610",overflowY:"auto",height:"100%",gap:10}}>
+
+          {/* Actions rapides */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
+            <button onClick={addText} style={{padding:"8px 16px",borderRadius:9,border:`1px solid ${D.border}`,background:D.input,color:D.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>🔤 + Texte</button>
+            {selected&&(
+              <>
+                <button onClick={()=>dupliquer(selected)} style={{padding:"8px 16px",borderRadius:9,border:`1px solid ${D.border}`,background:D.input,color:D.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>📋 Dupliquer</button>
+                <button onClick={()=>delEl(selected)} style={{padding:"8px 16px",borderRadius:9,border:"1px solid rgba(255,69,58,0.4)",background:"rgba(255,69,58,0.1)",color:"#FF453A",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700}}>🗑 Supprimer</button>
+                <button onClick={()=>setSelected(null)} style={{padding:"8px 16px",borderRadius:9,border:`1px solid ${D.border}`,background:"transparent",color:D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:600}}>✕ Désélect.</button>
+              </>
+            )}
+          </div>
+
+          {/* Canvas */}
+          <div ref={previewRef} onClick={e=>{if(e.target===previewRef.current)setSelected(null);}}
+            style={{position:"relative",width:PREV_W,height:PREV_H,borderRadius:14,overflow:"hidden",boxShadow:"0 28px 80px rgba(0,0,0,0.7)",flexShrink:0,cursor:"default",...getBgStyle()}}>
+            {elements.map(el=>(
+              <div key={el.id}
+                onMouseDown={e=>startDrag(e,el.id)}
+                onTouchStart={e=>startDrag(e,el.id,true)}
+                style={{position:"absolute",left:`${el.x*100}%`,top:`${el.y*100}%`,opacity:el.opacity??1,transform:`rotate(${el.rotation||0}deg)`,cursor:"move",outline:selected===el.id?"2px dashed rgba(20,0,255,0.8)":"none",outlineOffset:5,borderRadius:3,userSelect:"none",zIndex:selected===el.id?100:1,padding:3}}>
+                {el.type==="text"&&(
+                  <span style={{fontFamily:`"${el.font}",Arial`,fontSize:`${el.size/scaleY}px`,color:el.color,fontWeight:el.bold?"900":"400",fontStyle:el.italic?"italic":"normal",display:"block",whiteSpace:"pre",lineHeight:1.2,textShadow:el.shadow?"2px 2px 6px rgba(0,0,0,0.9)":"none",textAlign:el.align||"left"}}>
+                    {el.text}
+                  </span>
+                )}
+                {el.type==="sticker"&&<span style={{fontSize:`${el.size/scaleY}px`,lineHeight:1,display:"block"}}>{el.text}</span>}
+                {el.type==="image"&&<img src={el.src} style={{width:`${el.w*PREV_W}px`,height:`${el.h*PREV_H}px`,objectFit:"cover",borderRadius:8,display:"block",pointerEvents:"none"}} alt=""/>}
+              </div>
+            ))}
+          </div>
+          <canvas ref={canvasRef} style={{display:"none"}}/>
+          <div style={{fontSize:11,color:D.muted,textAlign:"center"}}>Glissez les éléments pour les déplacer · Cliquez pour sélectionner</div>
+        </div>
+
+        {/* ═══ PANNEAU DROIT — PROPRIÉTÉS ═══ */}
+        <div style={{background:D.card,borderLeft:`1px solid ${D.border}`,overflowY:"auto",height:"100%"}}>
+          <div style={{borderBottom:`1px solid ${D.border}`,padding:"14px 16px",fontWeight:700,fontSize:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span>✏️ Propriétés</span>
+            {selected&&<button onClick={()=>delEl(selected)} style={{background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",color:"#FF453A",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}>🗑 Suppr.</button>}
+          </div>
+
+          {selEl ? (
+            <div style={{padding:16}}>
+
+              {/* TEXTE */}
+              {selEl.type==="text"&&(
+                <>
+                  <div style={S.section}>Contenu</div>
+                  <div style={{marginBottom:14}}>
+                    <label style={S.label}>Texte</label>
+                    <textarea value={selEl.text} onChange={e=>updEl(selected,{text:e.target.value})}
+                      style={{...S.input,resize:"vertical",minHeight:70,lineHeight:1.6,fontSize:13}}/>
+                  </div>
+
+                  <div style={S.section}>Typographie</div>
+                  <div style={{marginBottom:12}}>
+                    <label style={S.label}>Police</label>
+                    <select value={selEl.font} onChange={e=>updEl(selected,{font:e.target.value})} style={{...S.input,cursor:"pointer"}}>
+                      {FONTS.map(f=><option key={f} value={f} style={{fontFamily:f}}>{f}</option>)}
+                    </select>
+                  </div>
+
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                    <div>
+                      <label style={S.label}>Taille (px)</label>
+                      <input type="number" value={selEl.size} min="8" max="400" onChange={e=>updEl(selected,{size:Number(e.target.value)})} style={S.input}/>
+                    </div>
+                    <div>
+                      <label style={S.label}>Couleur</label>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <input type="color" value={selEl.color.startsWith("rgba")?"#FFFFFF":selEl.color} onChange={e=>updEl(selected,{color:e.target.value})}
+                          style={{width:44,height:38,borderRadius:8,border:`1px solid ${D.border}`,cursor:"pointer",padding:2,background:"none"}}/>
+                        <input type="text" value={selEl.color} onChange={e=>updEl(selected,{color:e.target.value})}
+                          style={{...S.input,flex:1,fontSize:11}}/>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Taille slider */}
+                  <div style={{marginBottom:12}}>
+                    <label style={S.label}>Taille rapide — {selEl.size}px</label>
+                    <input type="range" min="8" max="200" value={selEl.size} onChange={e=>updEl(selected,{size:Number(e.target.value)})} style={{width:"100%",accentColor:"#1400FF",height:6}}/>
+                  </div>
+
+                  <div style={{display:"flex",gap:8,marginBottom:12}}>
+                    <button onClick={()=>updEl(selected,{bold:!selEl.bold})} style={{...S.btn(selEl.bold),flex:1,fontSize:16,fontWeight:900}}>B</button>
+                    <button onClick={()=>updEl(selected,{italic:!selEl.italic})} style={{...S.btn(selEl.italic),flex:1,fontSize:15,fontStyle:"italic",fontWeight:700}}>I</button>
+                    <button onClick={()=>updEl(selected,{shadow:!selEl.shadow})} style={{...S.btn(selEl.shadow,"#FF9F0A"),flex:2,fontSize:12}}>Ombre</button>
+                  </div>
+
+                  <div style={{marginBottom:14}}>
+                    <label style={S.label}>Alignement</label>
+                    <div style={{display:"flex",gap:8}}>
+                      {[["left","⬅️ Gauche"],["center","↔️ Centre"],["right","➡️ Droite"]].map(([a,lbl2])=>(
+                        <button key={a} onClick={()=>updEl(selected,{align:a})} style={{...S.btn(selEl.align===a),flex:1,fontSize:11}}>
+                          {lbl2}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* STICKER */}
+              {selEl.type==="sticker"&&(
+                <div style={{marginBottom:14}}>
+                  <div style={S.section}>Sticker</div>
+                  <div style={{textAlign:"center",fontSize:selEl.size/scaleY,lineHeight:1,marginBottom:14,padding:12,background:D.input,borderRadius:12}}>{selEl.text}</div>
+                  <label style={S.label}>Taille — {selEl.size}px</label>
+                  <input type="range" min="20" max="250" value={selEl.size} onChange={e=>updEl(selected,{size:Number(e.target.value)})} style={{width:"100%",accentColor:"#1400FF"}}/>
+                </div>
+              )}
+
+              {/* IMAGE */}
+              {selEl.type==="image"&&(
+                <div>
+                  <div style={S.section}>Image</div>
+                  <img src={selEl.src} style={{width:"100%",borderRadius:10,objectFit:"cover",height:80,marginBottom:12,border:`1px solid ${D.border}`}}/>
+                  <div style={{marginBottom:12}}>
+                    <label style={S.label}>Largeur — {Math.round(selEl.w*100)}%</label>
+                    <input type="range" min="0.05" max="1" step="0.01" value={selEl.w} onChange={e=>updEl(selected,{w:Number(e.target.value)})} style={{width:"100%",accentColor:"#1400FF"}}/>
+                  </div>
+                  <div style={{marginBottom:12}}>
+                    <label style={S.label}>Hauteur — {Math.round(selEl.h*100)}%</label>
+                    <input type="range" min="0.05" max="1" step="0.01" value={selEl.h} onChange={e=>updEl(selected,{h:Number(e.target.value)})} style={{width:"100%",accentColor:"#1400FF"}}/>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14,padding:"10px 12px",background:"rgba(255,159,10,0.08)",border:"1px solid rgba(255,159,10,0.25)",borderRadius:10}}>
+                    <div style={{fontSize:11,color:"#FF9F0A",gridColumn:"1/-1",marginBottom:6,fontWeight:600}}>📐 Position dans les calques</div>
+                    <button onClick={()=>{
+                      setElements(prev=>{const el=prev.find(e=>e.id===selected);return [el,...prev.filter(e=>e.id!==selected)];});
+                    }} style={{padding:"9px 6px",borderRadius:9,background:"rgba(20,0,255,0.1)",border:"1px solid rgba(20,0,255,0.3)",color:"#6680FF",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit",textAlign:"center"}}>
+                      ⬇️ Arrière-plan
+                    </button>
+                    <button onClick={()=>{
+                      setElements(prev=>{const el=prev.find(e=>e.id===selected);return [...prev.filter(e=>e.id!==selected),el];});
+                    }} style={{padding:"9px 6px",borderRadius:9,background:"rgba(0,230,118,0.1)",border:"1px solid rgba(0,230,118,0.3)",color:"#00E676",cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"inherit",textAlign:"center"}}>
+                      ⬆️ Premier plan
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* COMMUN */}
+              <div style={{height:1,background:D.border,margin:"4px 0 14px"}}/>
+              <div style={S.section}>Position & Transformation</div>
+
+              <div style={{marginBottom:12}}>
+                <label style={S.label}>Opacité — {Math.round((selEl.opacity??1)*100)}%</label>
+                <input type="range" min="0.05" max="1" step="0.05" value={selEl.opacity??1} onChange={e=>updEl(selected,{opacity:Number(e.target.value)})} style={{width:"100%",accentColor:"#1400FF"}}/>
+              </div>
+
+              <div style={{marginBottom:12}}>
+                <label style={S.label}>Rotation — {selEl.rotation||0}°</label>
+                <input type="range" min="-180" max="180" step="1" value={selEl.rotation||0} onChange={e=>updEl(selected,{rotation:Number(e.target.value)})} style={{width:"100%",accentColor:"#1400FF"}}/>
+                <div style={{display:"flex",gap:6,marginTop:6}}>
+                  {[-90,-45,0,45,90].map(r=>(
+                    <button key={r} onClick={()=>updEl(selected,{rotation:r})} style={{flex:1,padding:"5px 2px",borderRadius:7,border:`1px solid ${D.border}`,background:D.input,color:D.muted,cursor:"pointer",fontSize:11,fontFamily:"inherit"}}>{r}°</button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                <div>
+                  <label style={S.label}>Position X — {Math.round(selEl.x*100)}%</label>
+                  <input type="range" min="0" max="0.95" step="0.01" value={selEl.x} onChange={e=>updEl(selected,{x:Number(e.target.value)})} style={{width:"100%",accentColor:"#1400FF"}}/>
+                </div>
+                <div>
+                  <label style={S.label}>Position Y — {Math.round(selEl.y*100)}%</label>
+                  <input type="range" min="0" max="0.95" step="0.01" value={selEl.y} onChange={e=>updEl(selected,{y:Number(e.target.value)})} style={{width:"100%",accentColor:"#1400FF"}}/>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={()=>dupliquer(selected)} style={{padding:"10px",borderRadius:10,background:D.input,border:`1px solid ${D.border}`,color:D.text,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}>📋 Dupliquer</button>
+                <button onClick={()=>delEl(selected)} style={{padding:"10px",borderRadius:10,background:"rgba(255,69,58,0.1)",border:"1px solid rgba(255,69,58,0.3)",color:"#FF453A",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"inherit"}}>🗑 Supprimer</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{textAlign:"center",padding:"3rem 1.5rem",color:D.muted}}>
+              <div style={{fontSize:52,marginBottom:14}}>👆</div>
+              <div style={{fontSize:14,fontWeight:700,marginBottom:8,color:D.text}}>Sélectionnez un élément</div>
+              <div style={{fontSize:12,lineHeight:1.7}}>
+                Cliquez sur un texte, une image ou un sticker pour modifier ses propriétés ici
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* TOAST */}
+      <div ref={toastRef} style={{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:"#1C1C2E",border:"1px solid rgba(255,255,255,0.12)",color:"#F0F0F8",padding:"12px 24px",borderRadius:12,fontSize:14,fontWeight:600,boxShadow:"0 8px 32px rgba(0,0,0,0.4)",zIndex:9999,opacity:0,transition:"opacity 0.3s",pointerEvents:"none",whiteSpace:"nowrap"}}/>
+    </div>
+  );
+}
+
+
 // ─── LOGO SVG PIXEL-PERFECT ───────────────────────────────────────────────────
 const AngyLogo = ({ width = 180, light = false }) => {
   const tc = light ? "#0A0A0F" : "#FFFFFF";
@@ -814,7 +1345,7 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
       <header style={{background:dark?"rgba(8,8,15,0.97)":"rgba(240,240,248,0.97)",backdropFilter:"blur(20px)",borderBottom:`1px solid ${D.border}`,padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,gap:12}}>
         <AngyLogo width={150} light={!dark}/>
         <div style={{display:"flex",gap:6,overflowX:"auto"}}>
-          {[["creer","✨ Créer"],["animer","🎬 Animer"],["scripts","🎤 Scripts"],["calendrier","📅 Calendrier"],["stats","📊 Stats"],["planifier","🗓 Planifier"],["historique","🗂 Historique"]].map(([id,lbl])=>(
+          {[["creer","✨ Créer"],["editeur","🎨 Éditeur"],["animer","🎬 Animer"],["scripts","🎤 Scripts"],["calendrier","📅 Calendrier"],["stats","📊 Stats"],["planifier","🗓 Planifier"],["historique","🗂 Historique"]].map(([id,lbl])=>(
             <button key={id} style={css.tab(tab===id)} onClick={()=>setTab(id)}>{lbl}</button>
           ))}
         </div>
@@ -1006,6 +1537,13 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ══ ÉDITEUR VISUEL ══ */}
+        {tab==="editeur"&&(
+          <div style={{margin:"-18px -14px"}}>
+            <EditeurVisuel/>
           </div>
         )}
 
