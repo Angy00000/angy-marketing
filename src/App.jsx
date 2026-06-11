@@ -418,13 +418,24 @@ export default function App() {
   const [planHeure, setPlanHeure] = useState("18:00");
   const [planReseau, setPlanReseau] = useState("📘 Facebook");
   const [planNote, setPlanNote] = useState("");
-  // Animation
-  const [animRunning, setAnimRunning] = useState(false);
+  const [scriptType, setScriptType] = useState("unboxing");
+  const [scriptProduit, setScriptProduit] = useState("");
+  const [scriptPrix, setScriptPrix] = useState("");
+  const [scriptResult, setScriptResult] = useState("");
+  const [scriptLoading, setScriptLoading] = useState(false);
+  const [legendeReseau, setLegendeReseau] = useState("tiktok");
+  const [legendeResult, setLegendeResult] = useState("");
+  const [legendeLoading, setLegendeLoading] = useState(false);
+  const [stats, setStats] = useState(()=>JSON.parse(localStorage.getItem("angy_stats")||JSON.stringify({
+    semaines:[], facebook:0, instagram:0, tiktok:0, snapchat:0,
+    ventesParSemaine:0, messagesParJour:0,
+  })));
   const [animProgress, setAnimProgress] = useState(0);
   const [enregistrement, setEnregistrement] = useState(false);
   const [animStyle, setAnimStyle] = useState("slide"); // slide, pulse, zoom
+  // Animation
+  const [animRunning, setAnimRunning] = useState(false);
   const animCanvasRef = useRef();
-  const animFrameRef = useRef();
   const recorderRef = useRef();
   const chunksRef = useRef([]);
   const [toast, setToast] = useState(null);
@@ -724,6 +735,66 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
     return ()=>{ if(animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   },[]);
 
+  const SCRIPT_TYPES = [
+    {id:"unboxing",        label:"📦 Unboxing",        desc:"Déballer un iPhone en vidéo"},
+    {id:"comparaison",     label:"⚖️ Comparaison",      desc:"Comparer 2 modèles"},
+    {id:"conseil",         label:"💡 Conseil",          desc:"Éduquer sur les iPhone"},
+    {id:"temoignage",      label:"⭐ Témoignage",        desc:"Client satisfait"},
+    {id:"promo",           label:"🔥 Promo flash",      desc:"Offre limitée urgente"},
+    {id:"authentification",label:"🛡️ Authentification", desc:"Vrai vs faux iPhone"},
+  ];
+
+  const RESEAUX_SCRIPT = [
+    {id:"tiktok",    label:"🎵 TikTok",    hashtags:"#iPhone #Dakar #Tech #ANGY #iPhoneSenegal #TechDakar #AngyCompany"},
+    {id:"instagram", label:"📸 Instagram", hashtags:"#iPhone #Dakar #TechSenegal #ANGY #iPhoneDakar #AngyCompany #Senegal"},
+    {id:"facebook",  label:"📘 Facebook",  hashtags:"#ANGY #iPhone #Dakar #TechSenegal"},
+    {id:"snapchat",  label:"👻 Snapchat",  hashtags:"#iPhone #Dakar #ANGY"},
+  ];
+
+  const genScript = async() => {
+    setScriptLoading(true); setScriptResult("");
+    const sp = scriptProduit||produit;
+    const sx = scriptPrix||prix;
+    const prompts = {
+      unboxing:`Écris un script TikTok de 30-45 secondes pour un unboxing de ${sp} à ${sx} FCFA vendu chez ANGY COMPANY à Dakar. Structure: ACCROCHE (0-3s) · PRÉSENTATION (3-15s) · DÉBALLAGE (15-30s) · PRIX ET CONTACT (30-45s). Style naturel sénégalais enthousiaste. Contact: +221 78 116 32 86`,
+      comparaison:`Écris un script TikTok 30-45s pour comparer le ${sp} avec un modèle moins cher. Structure: ACCROCHE · DIFFÉRENCES CLÉS · LEQUEL CHOISIR · PRIX CHEZ ANGY. Style direct et éducatif. Contact: +221 78 116 32 86`,
+      conseil:`Écris un script TikTok 30-45s donnant 3 conseils pour bien choisir son iPhone, en mentionnant ANGY COMPANY Dakar comme vendeur de confiance. Contact: +221 78 116 32 86`,
+      temoignage:`Écris un script TikTok 30s simulant un témoignage de client satisfait d'ANGY COMPANY Dakar qui a acheté un ${sp}. Style authentique sénégalais. Contact: +221 78 116 32 86`,
+      promo:`Écris un script TikTok URGENT de 20-30s pour annoncer une promo flash sur ${sp} à ${sx} FCFA chez ANGY COMPANY Dakar. Crée maximum d'urgence. Contact: +221 78 116 32 86`,
+      authentification:`Écris un script TikTok éducatif 30-45s expliquant comment reconnaître un vrai iPhone d'une contrefaçon, en positionnant ANGY COMPANY comme vendeur certifié à Dakar. Contact: +221 78 116 32 86`,
+    };
+    try{ setScriptResult(await callIA(prompts[scriptType]||prompts.unboxing)); }
+    catch{ setScriptResult("Erreur — vérifiez votre connexion"); }
+    setScriptLoading(false);
+  };
+
+  const genLegendeScript = async() => {
+    setLegendeLoading(true); setLegendeResult("");
+    const sp = scriptProduit||produit;
+    const sx = scriptPrix||prix;
+    const reseau = RESEAUX_SCRIPT.find(r=>r.id===legendeReseau);
+    try{
+      setLegendeResult(await callIA(`Écris une légende optimisée pour ${reseau?.label} pour vendre le ${sp} à ${sx} FCFA chez ANGY COMPANY Dakar. Contact: +221 78 116 32 86. Site: angy-company-site.vercel.app. Inclus ces hashtags: ${reseau?.hashtags}. Style sénégalais naturel. Max 100 mots.`));
+    }catch{ setLegendeResult("Erreur — vérifiez votre connexion"); }
+    setLegendeLoading(false);
+  };
+
+  const sauvegarderStats=(newStats)=>{
+    setStats(newStats);
+    localStorage.setItem("angy_stats",JSON.stringify(newStats));
+    showToast("✅ Stats sauvegardées !");
+  };
+
+  const ajouterSemaine=()=>{
+    const sem={
+      id:Date.now(), semaine:`Semaine ${stats.semaines.length+1}`,
+      date:new Date().toLocaleDateString("fr-FR"),
+      facebook:stats.facebook, instagram:stats.instagram,
+      tiktok:stats.tiktok, ventes:stats.ventesParSemaine, messages:stats.messagesParJour,
+    };
+    sauvegarderStats({...stats,semaines:[...stats.semaines,sem]});
+  };
+
   const css = {
     panel:{background:D.card,border:`1px solid ${D.border}`,borderRadius:16,padding:18,marginBottom:12},
     ptitle:{fontSize:11,fontWeight:700,color:D.muted,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12},
@@ -854,6 +925,38 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
                 ))}
               </div>
 
+              {/* BOUTONS OUVRIR APPS */}
+              <div style={css.panel}>
+                <div style={css.ptitle}>🚀 Ouvrir directement</div>
+                <p style={{fontSize:12,color:D.muted,marginBottom:12,lineHeight:1.6}}>
+                  Téléchargez votre visuel puis ouvrez l'app directement pour publier !
+                </p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[
+                    {label:"CapCut",    icon:"🎬", color:"#000000", url:"capcut://", fallback:"https://www.capcut.com"},
+                    {label:"TikTok",    icon:"🎵", color:"#000000", url:"snssdk1233://", fallback:"https://www.tiktok.com"},
+                    {label:"Instagram", icon:"📸", color:"#E1306C", url:"instagram://", fallback:"https://www.instagram.com"},
+                    {label:"Facebook",  icon:"📘", color:"#1877F2", url:"fb://", fallback:"https://www.facebook.com"},
+                    {label:"WhatsApp",  icon:"💬", color:"#25D366", url:"whatsapp://", fallback:"https://wa.me/221781163286"},
+                    {label:"Snapchat",  icon:"👻", color:"#FFD700", url:"snapchat://", fallback:"https://www.snapchat.com"},
+                  ].map(app=>(
+                    <button key={app.label} onClick={()=>{
+                      // Essaie d'ouvrir l'app native, sinon ouvre le site web
+                      const a = document.createElement("a");
+                      a.href = app.url;
+                      a.click();
+                      setTimeout(()=>{ window.open(app.fallback,"_blank"); }, 1500);
+                    }} style={{padding:"12px 8px",borderRadius:11,background:`${app.color}18`,border:`1px solid ${app.color}44`,color:D.text,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,textAlign:"center",transition:"all 0.15s",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                      <span style={{fontSize:20}}>{app.icon}</span>
+                      {app.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{marginTop:12,padding:"10px 12px",background:"rgba(255,159,10,0.1)",border:"1px solid rgba(255,159,10,0.3)",borderRadius:10,fontSize:11,color:"#FF9F0A",lineHeight:1.6}}>
+                  💡 <strong>Workflow :</strong> Téléchargez le visuel → ouvrez CapCut → importez → ajoutez musique → publiez sur TikTok !
+                </div>
+              </div>
+
               {/* IA */}
               <div style={css.panel}>
                 <div style={css.ptitle}>🤖 IA — Légende automatique</div>
@@ -867,9 +970,26 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
             <div>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:10}}>
                 <div style={{fontWeight:800,fontSize:18}}>Aperçu</div>
-                <button onClick={telecharger} style={{background:"linear-gradient(135deg,#1400FF,#7700CC)",color:"#fff",border:"none",padding:"10px 22px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit",boxShadow:"0 4px 16px rgba(20,0,255,0.3)"}}>
-                  ⬇️ Télécharger PNG
-                </button>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={async()=>{
+                    dessiner();
+                    setTimeout(async()=>{
+                      const canvas=canvasRef.current;
+                      canvas.toBlob(async blob=>{
+                        if(navigator.share){
+                          const file=new File([blob],"ANGY_visuel.png",{type:"image/png"});
+                          try{ await navigator.share({files:[file],title:"ANGY COMPANY",text:"Visuel ANGY Company"}); }
+                          catch(e){ showToast("Partage annulé"); }
+                        } else { showToast("Partage non disponible sur ce navigateur"); }
+                      });
+                    },100);
+                  }} style={{background:"rgba(0,230,118,0.12)",border:"1px solid #00E676",color:"#00E676",padding:"9px 16px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>
+                    📤 Partager
+                  </button>
+                  <button onClick={telecharger} style={{background:"linear-gradient(135deg,#1400FF,#7700CC)",color:"#fff",border:"none",padding:"10px 22px",borderRadius:10,fontWeight:700,cursor:"pointer",fontSize:14,fontFamily:"inherit",boxShadow:"0 4px 16px rgba(20,0,255,0.3)"}}>
+                    ⬇️ Télécharger PNG
+                  </button>
+                </div>
               </div>
 
               <div style={{display:"flex",justifyContent:"center",background:dark?"repeating-conic-gradient(rgba(255,255,255,0.025) 0% 25%,transparent 0% 50%) 0 0/20px 20px":"repeating-conic-gradient(rgba(0,0,0,0.04) 0% 25%,transparent 0% 50%) 0 0/20px 20px",borderRadius:16,border:`1px solid ${D.border}`,padding:22,marginBottom:14}}>
@@ -1082,136 +1202,82 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
         )}
 
         {/* ══ SCRIPTS TIKTOK ══ */}
-        {tab==="scripts"&&(()=>{
-          const [scriptType, setScriptType] = useState("unboxing");
-          const [scriptProduit, setScriptProduit] = useState(produit);
-          const [scriptPrix, setScriptPrix] = useState(prix);
-          const [scriptResult, setScriptResult] = useState("");
-          const [scriptLoading, setScriptLoading] = useState(false);
-          const [legendeReseau, setLegendeReseau] = useState("tiktok");
-          const [legendeResult, setLegendeResult] = useState("");
-          const [legendeLoading, setLegendeLoading] = useState(false);
-
-          const SCRIPT_TYPES = [
-            {id:"unboxing", label:"📦 Unboxing", desc:"Déballer un iPhone en vidéo"},
-            {id:"comparaison", label:"⚖️ Comparaison", desc:"Comparer 2 modèles"},
-            {id:"conseil", label:"💡 Conseil", desc:"Éduquer sur les iPhone"},
-            {id:"temoignage", label:"⭐ Témoignage", desc:"Client satisfait"},
-            {id:"promo", label:"🔥 Promo flash", desc:"Offre limitée urgente"},
-            {id:"authentification", label:"🛡️ Authentification", desc:"Vrai vs faux iPhone"},
-          ];
-
-          const RESEAUX = [
-            {id:"tiktok", label:"🎵 TikTok", hashtags:"#iPhone #Dakar #Tech #ANGY #iPhoneSenegal #TechDakar #AngyCompany"},
-            {id:"instagram", label:"📸 Instagram", hashtags:"#iPhone #Dakar #TechSenegal #ANGY #iPhoneDakar #AngyCompany #Senegal"},
-            {id:"facebook", label:"📘 Facebook", hashtags:"#ANGY #iPhone #Dakar #TechSenegal"},
-            {id:"snapchat", label:"👻 Snapchat", hashtags:"#iPhone #Dakar #ANGY"},
-          ];
-
-          const genScript = async() => {
-            setScriptLoading(true); setScriptResult("");
-            const prompts = {
-              unboxing: `Écris un script TikTok de 30-45 secondes pour un unboxing de ${scriptProduit} à ${scriptPrix} FCFA vendu chez ANGY COMPANY à Dakar. Structure: ACCROCHE (0-3s) · PRÉSENTATION (3-15s) · DÉBALLAGE (15-30s) · PRIX ET CONTACT (30-45s). Style naturel sénégalais, enthousiaste. Contact: +221 78 116 32 86`,
-              comparaison: `Écris un script TikTok 30-45s pour comparer le ${scriptProduit} avec un modèle moins cher. Structure: ACCROCHE · DIFFÉRENCES CLÉS · LEQUEL CHOISIR · PRIX CHEZ ANGY. Style direct et éducatif. Contact: +221 78 116 32 86`,
-              conseil: `Écris un script TikTok 30-45s donnant 3 conseils pour bien choisir son iPhone, en mentionnant ANGY COMPANY Dakar comme vendeur de confiance. Contact: +221 78 116 32 86`,
-              temoignage: `Écris un script TikTok 30s simulant un témoignage de client satisfait d'ANGY COMPANY Dakar qui a acheté un ${scriptProduit}. Style authentique sénégalais. Contact: +221 78 116 32 86`,
-              promo: `Écris un script TikTok URGENT de 20-30s pour annoncer une promo flash sur ${scriptProduit} à ${scriptPrix} FCFA chez ANGY COMPANY Dakar. Crée maximum d'urgence. Contact: +221 78 116 32 86`,
-              authentification: `Écris un script TikTok éducatif 30-45s expliquant comment reconnaître un vrai iPhone d'une contrefaçon, en positionnant ANGY COMPANY comme vendeur certifié à Dakar. Contact: +221 78 116 32 86`,
-            };
-            try { setScriptResult(await callIA(prompts[scriptType]||prompts.unboxing)); }
-            catch { setScriptResult("Erreur — vérifiez votre connexion"); }
-            setScriptLoading(false);
-          };
-
-          const genLegende = async() => {
-            setLegendeLoading(true); setLegendeResult("");
-            const reseau = RESEAUX.find(r=>r.id===legendeReseau);
-            try {
-              setLegendeResult(await callIA(`Écris une légende optimisée pour ${reseau.label} pour vendre le ${scriptProduit} à ${scriptPrix} FCFA chez ANGY COMPANY Dakar. Contact: +221 78 116 32 86. Site: angy-company-site.vercel.app. Inclus ces hashtags: ${reseau.hashtags}. Style sénégalais naturel. Max 100 mots.`));
-            } catch { setLegendeResult("Erreur — vérifiez votre connexion"); }
-            setLegendeLoading(false);
-          };
-
-          return (
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
-              {/* SCRIPTS */}
-              <div>
-                <div style={css.panel}>
-                  <div style={css.ptitle}>🎤 Générateur de scripts TikTok</div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
-                    {SCRIPT_TYPES.map(s=>(
-                      <button key={s.id} onClick={()=>setScriptType(s.id)} style={{padding:"10px 8px",borderRadius:10,border:`1px solid ${scriptType===s.id?"#1400FF":D.border}`,background:scriptType===s.id?"rgba(20,0,255,0.12)":"transparent",color:scriptType===s.id?"#6680FF":D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700,textAlign:"center",transition:"all 0.15s"}}>
-                        <div style={{fontSize:18,marginBottom:3}}>{s.label.split(" ")[0]}</div>
-                        {s.label.split(" ").slice(1).join(" ")}<br/>
-                        <span style={{fontSize:10,fontWeight:400}}>{s.desc}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{marginBottom:10}}>
-                    <label style={css.label}>Produit</label>
-                    <input style={css.input} value={scriptProduit} onChange={e=>setScriptProduit(e.target.value)}/>
-                  </div>
-                  <div style={{marginBottom:14}}>
-                    <label style={css.label}>Prix (FCFA)</label>
-                    <input style={css.input} value={scriptPrix} onChange={e=>setScriptPrix(e.target.value)}/>
-                  </div>
-                  <button style={css.btn("#CC0000")} onClick={genScript} disabled={scriptLoading}>
-                    {scriptLoading?"⏳ Génération...":"🎬 Générer le script"}
-                  </button>
-                  {scriptResult&&(
-                    <div style={{marginTop:14,background:D.input,borderRadius:12,padding:14,border:`1px solid ${D.border}`}}>
-                      <div style={{fontSize:11,fontWeight:700,color:"#CC0000",marginBottom:8,textTransform:"uppercase"}}>📝 Script prêt à filmer</div>
-                      <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:D.text}}>{scriptResult}</div>
-                      <button onClick={()=>{navigator.clipboard.writeText(scriptResult);showToast("✅ Script copié !");}} style={{marginTop:10,padding:"7px 14px",borderRadius:8,background:D.input,border:`1px solid ${D.border}`,color:D.text,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* LÉGENDES */}
-              <div>
-                <div style={css.panel}>
-                  <div style={css.ptitle}>📝 Légendes optimisées par réseau</div>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
-                    {RESEAUX.map(r=>(
-                      <button key={r.id} onClick={()=>setLegendeReseau(r.id)} style={{padding:"8px 12px",borderRadius:10,border:`1px solid ${legendeReseau===r.id?"#1400FF":D.border}`,background:legendeReseau===r.id?"rgba(20,0,255,0.12)":"transparent",color:legendeReseau===r.id?"#6680FF":D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s"}}>
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
-                  <button style={css.btn("#7700CC")} onClick={genLegende} disabled={legendeLoading}>
-                    {legendeLoading?"⏳ Génération...":"✍️ Générer la légende"}
-                  </button>
-                  {legendeResult&&(
-                    <div style={{marginTop:14,background:D.input,borderRadius:12,padding:14,border:`1px solid ${D.border}`}}>
-                      <div style={{fontSize:11,fontWeight:700,color:"#7700CC",marginBottom:8,textTransform:"uppercase"}}>
-                        ✍️ Légende {RESEAUX.find(r=>r.id===legendeReseau)?.label}
-                      </div>
-                      <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:D.text}}>{legendeResult}</div>
-                      <button onClick={()=>{navigator.clipboard.writeText(legendeResult);showToast("✅ Légende copiée !");}} style={{marginTop:10,padding:"7px 14px",borderRadius:8,background:D.input,border:`1px solid ${D.border}`,color:D.text,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
-                    </div>
-                  )}
-                </div>
-
-                {/* HASHTAGS */}
-                <div style={css.panel}>
-                  <div style={css.ptitle}>🏷️ Hashtags optimisés</div>
-                  {RESEAUX.map(r=>(
-                    <div key={r.id} style={{marginBottom:12,padding:"10px 12px",background:D.input,borderRadius:10,border:`1px solid ${D.border}`}}>
-                      <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>{r.label}</div>
-                      <div style={{fontSize:11,color:D.muted,lineHeight:1.8}}>{r.hashtags}</div>
-                      <button onClick={()=>{navigator.clipboard.writeText(r.hashtags);showToast("✅ Hashtags copiés !");}} style={{marginTop:6,padding:"4px 10px",borderRadius:7,background:"transparent",border:`1px solid ${D.border}`,color:D.muted,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
-                    </div>
+        {tab==="scripts"&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+            {/* SCRIPTS */}
+            <div>
+              <div style={css.panel}>
+                <div style={css.ptitle}>🎤 Générateur de scripts TikTok</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
+                  {SCRIPT_TYPES.map(s=>(
+                    <button key={s.id} onClick={()=>setScriptType(s.id)} style={{padding:"10px 8px",borderRadius:10,border:`1px solid ${scriptType===s.id?"#1400FF":D.border}`,background:scriptType===s.id?"rgba(20,0,255,0.12)":"transparent",color:scriptType===s.id?"#6680FF":D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:11,fontWeight:700,textAlign:"center",transition:"all 0.15s"}}>
+                      <div style={{fontSize:18,marginBottom:3}}>{s.label.split(" ")[0]}</div>
+                      {s.label.split(" ").slice(1).join(" ")}<br/>
+                      <span style={{fontSize:10,fontWeight:400}}>{s.desc}</span>
+                    </button>
                   ))}
                 </div>
+                <div style={{marginBottom:10}}>
+                  <label style={css.label}>Produit</label>
+                  <input style={css.input} value={scriptProduit||produit} onChange={e=>setScriptProduit(e.target.value)}/>
+                </div>
+                <div style={{marginBottom:14}}>
+                  <label style={css.label}>Prix (FCFA)</label>
+                  <input style={css.input} value={scriptPrix||prix} onChange={e=>setScriptPrix(e.target.value)}/>
+                </div>
+                <button style={css.btn("#CC0000")} onClick={genScript} disabled={scriptLoading}>
+                  {scriptLoading?"⏳ Génération...":"🎬 Générer le script"}
+                </button>
+                {scriptResult&&(
+                  <div style={{marginTop:14,background:D.input,borderRadius:12,padding:14,border:`1px solid ${D.border}`}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#CC0000",marginBottom:8,textTransform:"uppercase"}}>📝 Script prêt à filmer</div>
+                    <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:D.text}}>{scriptResult}</div>
+                    <button onClick={()=>{navigator.clipboard.writeText(scriptResult);showToast("✅ Script copié !");}} style={{marginTop:10,padding:"7px 14px",borderRadius:8,background:D.input,border:`1px solid ${D.border}`,color:D.text,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
+                  </div>
+                )}
               </div>
             </div>
-          );
-        })()}
+
+            {/* LÉGENDES */}
+            <div>
+              <div style={css.panel}>
+                <div style={css.ptitle}>📝 Légendes optimisées par réseau</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+                  {RESEAUX_SCRIPT.map(r=>(
+                    <button key={r.id} onClick={()=>setLegendeReseau(r.id)} style={{padding:"8px 12px",borderRadius:10,border:`1px solid ${legendeReseau===r.id?"#1400FF":D.border}`,background:legendeReseau===r.id?"rgba(20,0,255,0.12)":"transparent",color:legendeReseau===r.id?"#6680FF":D.muted,cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,transition:"all 0.15s"}}>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+                <button style={css.btn("#7700CC")} onClick={genLegendeScript} disabled={legendeLoading}>
+                  {legendeLoading?"⏳ Génération...":"✍️ Générer la légende"}
+                </button>
+                {legendeResult&&(
+                  <div style={{marginTop:14,background:D.input,borderRadius:12,padding:14,border:`1px solid ${D.border}`}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#7700CC",marginBottom:8,textTransform:"uppercase"}}>
+                      ✍️ Légende {RESEAUX_SCRIPT.find(r=>r.id===legendeReseau)?.label}
+                    </div>
+                    <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap",color:D.text}}>{legendeResult}</div>
+                    <button onClick={()=>{navigator.clipboard.writeText(legendeResult);showToast("✅ Légende copiée !");}} style={{marginTop:10,padding:"7px 14px",borderRadius:8,background:D.input,border:`1px solid ${D.border}`,color:D.text,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
+                  </div>
+                )}
+              </div>
+              <div style={css.panel}>
+                <div style={css.ptitle}>🏷️ Hashtags optimisés</div>
+                {RESEAUX_SCRIPT.map(r=>(
+                  <div key={r.id} style={{marginBottom:12,padding:"10px 12px",background:D.input,borderRadius:10,border:`1px solid ${D.border}`}}>
+                    <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>{r.label}</div>
+                    <div style={{fontSize:11,color:D.muted,lineHeight:1.8}}>{r.hashtags}</div>
+                    <button onClick={()=>{navigator.clipboard.writeText(r.hashtags);showToast("✅ Hashtags copiés !");}} style={{marginTop:6,padding:"4px 10px",borderRadius:7,background:"transparent",border:`1px solid ${D.border}`,color:D.muted,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>📋 Copier</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ══ CALENDRIER 30 JOURS ══ */}
         {tab==="calendrier"&&(()=>{
-          const JOURS = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
           const CONTENU_PAR_JOUR = [
             {jour:"Lundi",   icon:"📦", type:"Unboxing",      reseau:"TikTok",    desc:"Déballez un iPhone du stock"},
             {jour:"Mardi",   icon:"⚖️", type:"Comparaison",   reseau:"Instagram", desc:"Comparez 2 modèles iPhone"},
@@ -1283,32 +1349,6 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
 
         {/* ══ STATS ══ */}
         {tab==="stats"&&(()=>{
-          const [stats, setStats] = useState(()=>JSON.parse(localStorage.getItem("angy_stats")||JSON.stringify({
-            semaines:[],
-            facebook:0, instagram:0, tiktok:0, snapchat:0,
-            ventesParSemaine:0, messagesParJour:0,
-          })));
-
-          const sauvegarder=(newStats)=>{
-            setStats(newStats);
-            localStorage.setItem("angy_stats",JSON.stringify(newStats));
-            showToast("✅ Stats sauvegardées !");
-          };
-
-          const ajouterSemaine=()=>{
-            const sem={
-              id:Date.now(),
-              semaine:`Semaine ${stats.semaines.length+1}`,
-              date:new Date().toLocaleDateString("fr-FR"),
-              facebook:stats.facebook,
-              instagram:stats.instagram,
-              tiktok:stats.tiktok,
-              ventes:stats.ventesParSemaine,
-              messages:stats.messagesParJour,
-            };
-            sauvegarder({...stats,semaines:[...stats.semaines,sem]});
-          };
-
           const objetifs = {facebook:1000, instagram:800, tiktok:2000, ventes:15};
 
           return (
@@ -1362,7 +1402,7 @@ Inclus: accroche percutante, description, contact ${contact}, hashtags Dakar. St
                     </div>
                     <div style={{fontSize:10,color:D.muted,marginTop:3,textAlign:"right"}}>Objectif: 50/jour</div>
                   </div>
-                  <button style={css.btn()} onClick={()=>sauvegarder(stats)}>💾 Sauvegarder</button>
+                  <button style={css.btn()} onClick={()=>sauvegarderStats(stats)}>💾 Sauvegarder</button>
                   <button style={css.btnSec} onClick={ajouterSemaine}>📸 Snapshot semaine</button>
                 </div>
               </div>
